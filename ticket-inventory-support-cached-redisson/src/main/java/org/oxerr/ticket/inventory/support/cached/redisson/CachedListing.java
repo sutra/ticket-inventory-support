@@ -27,7 +27,7 @@ public class CachedListing<R extends Serializable> implements Serializable {
 
 	public static <T extends Serializable> boolean shouldCreate(
 		@Nonnull Listing<T> listing,
-		@Nullable  CachedListing<T> cachedListing) {
+		@Nullable CachedListing<T> cachedListing) {
 		return cachedListing == null
 			|| cachedListing.getStatus() == Status.PENDING_LIST
 			|| !cachedListing.getRequest().equals(listing.getRequest());

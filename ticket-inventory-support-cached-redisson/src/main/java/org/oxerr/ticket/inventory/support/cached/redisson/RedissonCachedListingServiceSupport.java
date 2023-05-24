@@ -13,6 +13,9 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.oxerr.ticket.inventory.support.Event;
@@ -26,7 +29,8 @@ public abstract
 	class RedissonCachedListingServiceSupport<
 	R extends Serializable,
 	L extends Listing<R>,
-	E extends Event<R, L>
+	E extends Event<R, L>,
+	C extends CachedListing<R>
 >
 	implements CachedListingService<R, L, E> {
 
@@ -40,7 +44,7 @@ public abstract
 	private final String keyPrefix;
 
 	// Event ID -> <Listing ID, CachedListing>
-	private final RMapCache<String, Map<String, CachedListing<R>>> listingsCache;
+	private final RMapCache<String, Map<String, C>> listingsCache;
 
 	protected RedissonCachedListingServiceSupport(RedissonClient redisson, String keyPrefix) {
 		this.redisson = redisson;
@@ -50,11 +54,11 @@ public abstract
 		this.listingsCache = redisson.getMapCache(cacheName);
 	}
 
-	public RMapCache<String, Map<String, CachedListing<R>>> getListingCache() {
+	public RMapCache<String, Map<String, C>> getListingCache() {
 		return listingsCache;
 	}
 
-	public void updateEvent(E event) {
+	public void updateListings(E event) {
 		String lockName = String.format("%s:event:lock:%s", keyPrefix, event.getId());
 		RReadWriteLock rwLock = redisson.getReadWriteLock(lockName);
 
@@ -68,7 +72,7 @@ public abstract
 	}
 
 	private void doUpdateEvent(E event) {
-		Map<String, CachedListing<R>> cache = this.getOrCreateCache(event);
+		Map<String, C> cache = this.getOrCreateCache(event);
 
 		try {
 			this.updateEvent(event, cache);
@@ -77,7 +81,7 @@ public abstract
 		}
 	}
 
-	private void updateEvent(E event, Map<String, CachedListing<R>> cache) {
+	private void updateEvent(E event, Map<String, C> cache) {
 		// delete
 		this.delete(event, cache);
 
@@ -85,15 +89,18 @@ public abstract
 		this.create(event, cache);
 	}
 
-	private void delete(E event, Map<String, CachedListing<R>> cache) {
-		Set<String> inventoryTicketIds = event.getListings()
+	private void delete(E event, Map<String, C> cache) {
+		Set<String> inventoryTicketIds = event
+			.getListings()
 			.stream()
 			.map(L::getId)
 			.collect(Collectors.toSet());
 
-		Set<String> pendingDeleteTicketIds = cache.keySet()
+		Set<String> pendingDeleteTicketIds = cache
+			.entrySet()
 			.stream()
-			.filter(t -> !inventoryTicketIds.contains(t))
+			.filter(t -> this.shouldDelete(event, inventoryTicketIds, t.getKey(), t.getValue()))
+			.map(Map.Entry::getKey)
 			.collect(Collectors.toSet());
 
 		for (String ticketId : pendingDeleteTicketIds) {
@@ -108,17 +115,26 @@ public abstract
 		}
 	}
 
+	protected boolean shouldDelete(
+		@Nonnull E event,
+		@Nonnull Set<String> inventoryTicketIds,
+		@Nonnull String ticketId,
+		@Nonnull C cachedListing
+	) {
+		return !inventoryTicketIds.contains(ticketId);
+	}
+
 	protected abstract void doDelete(String ticketId) throws IOException;
 
-	private void create(E event, Map<String, CachedListing<R>> cache) {
+	private void create(E event, Map<String, C> cache) {
 		List<L> pendingCreateListings = event.getListings()
 			.stream()
-			.filter(listing -> CachedListing.shouldCreate(listing, cache.get(listing.getId())))
+			.filter(listing -> this.shouldCreate(event, listing, cache.get(listing.getId())))
 			.collect(Collectors.toList());
 
-		Map<String, CachedListing<R>> pendings = pendingCreateListings
+		Map<String, C> pendings = pendingCreateListings
 			.stream()
-			.collect(Collectors.toMap(L::getId, CachedListing::pending));
+			.collect(Collectors.toMap(L::getId, v -> this.toPending(event, v)));
 
 		cache.putAll(pendings);
 
@@ -130,33 +146,49 @@ public abstract
 			log.trace("Creating {}", listing.getId());
 
 			try {
-				this.doCreate(listing);
-				cache.put(listing.getId(), CachedListing.listed(listing));
+				this.doCreate(event, listing);
+				cache.put(listing.getId(), this.toListed(event, listing));
 			} catch (IOException e) {
 				log.warn("Create ticket {} failed.", listing.getId(), e);
 			}
 		}
 	}
 
-	protected abstract void doCreate(L listing) throws IOException;
+	protected boolean shouldCreate(@Nonnull E event, @Nonnull L listing, @Nullable C cachedListing) {
+		return cachedListing == null
+			|| cachedListing.getStatus() == Status.PENDING_LIST
+			|| !cachedListing.getRequest().equals(listing.getRequest());
+	}
 
-	private Map<String, CachedListing<R>> getOrCreateCache(E event) {
-		Map<String, CachedListing<R>> cache = this.listingsCache.get(event.getId());
+	protected abstract void doCreate(E event, L listing) throws IOException;
+
+	private Map<String, C> getOrCreateCache(E event) {
+		Map<String, C> cache = this.listingsCache.get(event.getId());
 		return Optional.ofNullable(cache).orElseGet(HashMap::new);
 	}
 
-	private void saveCache(E event, Map<String, CachedListing<R>> listings) {
+	private void saveCache(E event, Map<String, C> listings) {
 		long ttl = ttl(event);
 		this.listingsCache.fastPut(event.getId(), listings, ttl, TimeUnit.MINUTES);
 	}
 
 	private long ttl(E event) {
-		return Math.max(1, Duration.between(Instant.now(), this.cacheEnd(event)).toMinutes());
+		return Math.max(1, Duration.between(Instant.now(), this.cacheEndDate(event)).toMinutes());
 	}
 
-	protected Temporal cacheEnd(E event) {
+	protected Temporal cacheEndDate(E event) {
 		return event.getStartDate();
 	}
+
+	private C toPending(E event, L listing) {
+		return toCached(event, listing, Status.PENDING_LIST);
+	}
+
+	private C toListed(E event, L listing) {
+		return toCached(event, listing, Status.LISTED);
+	}
+
+	protected abstract C toCached(E event, L listing, Status status);
 
 	@Override
 	public long cacheSize() {
@@ -168,10 +200,10 @@ public abstract
 		return countListings(this.getListingCache());
 	}
 
-	private long countListings(RMapCache<String, Map<String, CachedListing<R>>> listingsCache) {
+	private long countListings(RMapCache<String, Map<String, C>> listingsCache) {
 		return listingsCache.values()
 			.stream()
-			.map((Map<String, CachedListing<R>> listings) -> listings.values().stream().filter(l -> l.getStatus() == Status.LISTED).count())
+			.map((Map<String, C> listings) -> listings.values().stream().filter(l -> l.getStatus() == Status.LISTED).count())
 			.reduce(0L, Long::sum);
 	}
 

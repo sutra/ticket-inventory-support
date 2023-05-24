@@ -11,7 +11,15 @@ public interface CachedListingService<
 	E extends Event<R, L>
 > {
 
-	void updateEvent(E event);
+	/**
+	 * Update the listings of the event.
+	 *
+	 * Delete all listings that should be deleted, create/update all listings
+	 * that should be created/updated.
+	 *
+	 * @param event the event.
+	 */
+	void updateListings(E event);
 
 	/**
 	 * Returns the size of the cache.

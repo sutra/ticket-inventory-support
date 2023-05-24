@@ -11,8 +11,8 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 /**
  * The event.
  *
- * @param <R> the type of the creating listing request.
- * @see Listing
+ * @param <R> the type of the request to create listing.
+ * @param <L> the type of the {@link Listing}.
  */
 public class Event<R extends Serializable, L extends Listing<R>> implements Serializable {
 

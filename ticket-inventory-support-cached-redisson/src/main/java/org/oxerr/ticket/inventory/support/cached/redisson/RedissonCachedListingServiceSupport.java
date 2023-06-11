@@ -49,7 +49,7 @@ public abstract
 	private final RedissonClient redissonClient;
 
 	/**
-	 * The key prefix for Redis entries(lock & cache).
+	 * The key prefix for Redis entries(lock &amp; cache).
 	 */
 	private final String keyPrefix;
 
@@ -66,7 +66,7 @@ public abstract
 	 * Constructs {@link RedissonCachedListingServiceSupport}.
 	 *
 	 * @param redissonClient the {@link RedissonClient}.
-	 * @param keyPrefix the key prefix for Redis entries(lock & cache).
+	 * @param keyPrefix the key prefix for Redis entries(lock &amp; cache).
 	 * @param create indicates if listings should be created.
 	 */
 	protected RedissonCachedListingServiceSupport(

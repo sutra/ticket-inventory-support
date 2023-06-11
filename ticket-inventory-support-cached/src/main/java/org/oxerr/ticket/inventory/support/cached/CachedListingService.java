@@ -5,6 +5,13 @@ import java.io.Serializable;
 import org.oxerr.ticket.inventory.support.Event;
 import org.oxerr.ticket.inventory.support.Listing;
 
+/**
+ * Listing services.
+ *
+ * @param <R> the type of create listing request.
+ * @param <L> the type of {@link Listing}.
+ * @param <E> the type of {@link Event}.
+ */
 public interface CachedListingService<
 	R extends Serializable,
 	L extends Listing<R>,

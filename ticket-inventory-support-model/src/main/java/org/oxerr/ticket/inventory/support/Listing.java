@@ -8,29 +8,30 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 /**
  * Listing on the sales platform.
  *
+ * @param <I> the type of the listing ID.
  * @param <R> the type of the creating listing request.
  */
-public class Listing<R extends Serializable> implements Serializable {
+public class Listing<I extends Serializable, R extends Serializable> implements Serializable {
 
 	private static final long serialVersionUID = 2023052301L;
 
-	private String id;
+	private I id;
 
 	private R request;
 
 	public Listing() {
 	}
 
-	public Listing(String id, R request) {
+	public Listing(I id, R request) {
 		this.id = id;
 		this.request = request;
 	}
 
-	public String getId() {
+	public I getId() {
 		return id;
 	}
 
-	public void setId(String id) {
+	public void setId(I id) {
 		this.id = id;
 	}
 

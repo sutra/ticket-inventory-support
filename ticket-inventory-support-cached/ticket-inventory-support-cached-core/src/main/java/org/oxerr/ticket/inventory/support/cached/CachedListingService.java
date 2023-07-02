@@ -8,14 +8,18 @@ import org.oxerr.ticket.inventory.support.Listing;
 /**
  * Listing services.
  *
+ * @param <P> the type of the event ID.
+ * @param <I> the type of the listing ID.
  * @param <R> the type of create listing request.
  * @param <L> the type of {@link Listing}.
  * @param <E> the type of {@link Event}.
  */
 public interface CachedListingService<
+	P extends Serializable,
+	I extends Serializable,
 	R extends Serializable,
-	L extends Listing<R>,
-	E extends Event<R, L>
+	L extends Listing<I, R>,
+	E extends Event<P, I, R, L>
 > {
 
 	/**

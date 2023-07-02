@@ -28,6 +28,7 @@ import org.redisson.api.RedissonClient;
 /**
  * The {@link CachedListingService} implementation using Redisson.
  *
+ * @param <P> the type of the event ID.
  * @param <R> the type of the create listing request.
  * @param <L> the type of the {@link Listing}.
  * @param <E> the type of the {@link Event}.
@@ -35,12 +36,14 @@ import org.redisson.api.RedissonClient;
  */
 public abstract
 	class RedissonCachedListingServiceSupport<
+	P extends Serializable,
+	I extends Serializable,
 	R extends Serializable,
-	L extends Listing<R>,
-	E extends Event<R, L>,
+	L extends Listing<I, R>,
+	E extends Event<P, I, R, L>,
 	C extends CachedListing<R>
 >
-	implements CachedListingService<R, L, E> {
+	implements CachedListingService<P, I, R, L, E> {
 
 	private final Logger log = LogManager.getLogger();
 
@@ -60,7 +63,7 @@ public abstract
 	 * the value is a map, with listing ID as key, and cached listing as value.
 	 * Event ID -> <Listing ID, CachedListing>
 	 */
-	private final RMapCache<String, Map<String, C>> listingsCache;
+	private final RMapCache<P, Map<I, C>> listingsCache;
 
 	/**
 	 * Constructs {@link RedissonCachedListingServiceSupport}.
@@ -87,7 +90,7 @@ public abstract
 	 *
 	 * @return the listing cache.
 	 */
-	public RMapCache<String, Map<String, C>> getListingCache() {
+	public RMapCache<P, Map<I, C>> getListingCache() {
 		return listingsCache;
 	}
 
@@ -112,7 +115,7 @@ public abstract
 	}
 
 	private void doUpdateEvent(final E event) {
-		final Map<String, C> cache = this.getOrCreateCache(event);
+		final Map<I, C> cache = this.getOrCreateCache(event);
 
 		try {
 			this.updateEvent(event, cache);
@@ -121,7 +124,7 @@ public abstract
 		}
 	}
 
-	private void updateEvent(final E event, final Map<String, C> cache) {
+	private void updateEvent(final E event, final Map<I, C> cache) {
 		// delete
 		this.delete(event, cache);
 
@@ -131,25 +134,25 @@ public abstract
 		}
 	}
 
-	private void delete(final E event, final Map<String, C> cache) {
-		final Set<String> inventoryTicketIds = event
+	private void delete(final E event, final Map<I, C> cache) {
+		final Set<I> inventoryTicketIds = event
 			.getListings()
 			.stream()
 			.map(L::getId)
 			.collect(Collectors.toSet());
 
-		final Set<String> pendingDeleteTicketIds = cache
+		final Set<I> pendingDeleteTicketIds = cache
 			.entrySet()
 			.stream()
 			.filter(t -> this.shouldDelete(event, inventoryTicketIds, t.getKey(), t.getValue()))
 			.map(Map.Entry::getKey)
 			.collect(Collectors.toSet());
 
-		for (final String ticketId : pendingDeleteTicketIds) {
+		for (final I ticketId : pendingDeleteTicketIds) {
 			log.trace("Deleting {}", ticketId);
 
 			try {
-				this.doDelete(ticketId);
+				this.deleteListing(event, ticketId);
 				cache.remove(ticketId);
 			} catch (IOException e) {
 				log.warn("Delete ticket {} failed.", ticketId, e);
@@ -159,22 +162,20 @@ public abstract
 
 	protected boolean shouldDelete(
 		@Nonnull final E event,
-		@Nonnull final Set<String> inventoryTicketIds,
-		@Nonnull final String ticketId,
+		@Nonnull final Set<I> inventoryTicketIds,
+		@Nonnull final I ticketId,
 		@Nonnull final C cachedListing
 	) {
 		return !inventoryTicketIds.contains(ticketId);
 	}
 
-	protected abstract void doDelete(String ticketId) throws IOException;
-
-	private void create(final E event, final Map<String, C> cache) {
+	private void create(final E event, final Map<I, C> cache) {
 		final List<L> pendingCreateListings = event.getListings()
 			.stream()
 			.filter(listing -> this.shouldCreate(event, listing, cache.get(listing.getId())))
 			.collect(Collectors.toList());
 
-		final Map<String, C> pendings = pendingCreateListings
+		final Map<I, C> pendings = pendingCreateListings
 			.stream()
 			.collect(Collectors.toMap(L::getId, v -> this.toPending(event, v)));
 
@@ -188,7 +189,7 @@ public abstract
 			log.trace("Creating {}", listing.getId());
 
 			try {
-				this.doCreate(event, listing);
+				this.createListing(event, listing);
 				cache.put(listing.getId(), this.toListed(event, listing));
 			} catch (IOException e) {
 				log.warn("Create ticket {} failed.", listing.getId(), e);
@@ -206,14 +207,12 @@ public abstract
 			|| !cachedListing.getRequest().equals(listing.getRequest());
 	}
 
-	protected abstract void doCreate(E event, L listing) throws IOException;
-
-	private Map<String, C> getOrCreateCache(final E event) {
-		Map<String, C> cache = this.listingsCache.get(event.getId());
+	private Map<I, C> getOrCreateCache(final E event) {
+		Map<I, C> cache = this.listingsCache.get(event.getId());
 		return Optional.ofNullable(cache).orElseGet(HashMap::new);
 	}
 
-	private void saveCache(final E event, final Map<String, C> listings) {
+	private void saveCache(final E event, final Map<I, C> listings) {
 		final long ttl = ttl(event);
 		this.listingsCache.fastPut(event.getId(), listings, ttl, TimeUnit.MINUTES);
 	}
@@ -234,6 +233,10 @@ public abstract
 		return toCached(event, listing, Status.LISTED);
 	}
 
+	protected abstract void deleteListing(E event, I ticketId) throws IOException;
+
+	protected abstract void createListing(E event, L listing) throws IOException;
+
 	protected abstract C toCached(E event, L listing, Status status);
 
 	@Override
@@ -246,10 +249,10 @@ public abstract
 		return countListings(this.getListingCache());
 	}
 
-	private long countListings(final RMapCache<String, Map<String, C>> listingsCache) {
+	private long countListings(final RMapCache<P, Map<I, C>> listingsCache) {
 		return listingsCache.values()
 			.stream()
-			.map((Map<String, C> listings) -> listings.values().stream().filter(l -> l.getStatus() == Status.LISTED).count())
+			.map((Map<I, C> listings) -> listings.values().stream().filter(l -> l.getStatus() == Status.LISTED).count())
 			.reduce(0L, Long::sum);
 	}
 

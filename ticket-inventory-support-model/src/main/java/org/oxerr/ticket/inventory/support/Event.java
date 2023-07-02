@@ -11,17 +11,19 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 /**
  * The event.
  *
+ * @param <P> the type of the event ID.
+ * @param <I> the type of the listing ID.
  * @param <R> the type of the request to create listing.
  * @param <L> the type of the {@link Listing}.
  */
-public class Event<R extends Serializable, L extends Listing<R>> implements Serializable {
+public class Event<P extends Serializable, I extends Serializable, R extends Serializable, L extends Listing<I, R>> implements Serializable {
 
 	private static final long serialVersionUID = 2023052301L;
 
 	/**
 	 * The event identifier.
 	 */
-	private String id;
+	private P id;
 
 	/**
 	 * The date when the event starts.
@@ -34,21 +36,21 @@ public class Event<R extends Serializable, L extends Listing<R>> implements Seri
 		this(null, null, Collections.emptyList());
 	}
 
-	public Event(String id, OffsetDateTime startDate) {
+	public Event(P id, OffsetDateTime startDate) {
 		this(id, startDate, Collections.emptyList());
 	}
 
-	public Event(String id, OffsetDateTime startDate, List<L> listings) {
+	public Event(P id, OffsetDateTime startDate, List<L> listings) {
 		this.id = id;
 		this.startDate = startDate;
 		this.listings = listings;
 	}
 
-	public String getId() {
+	public P getId() {
 		return id;
 	}
 
-	public void setId(String id) {
+	public void setId(P id) {
 		this.id = id;
 	}
 

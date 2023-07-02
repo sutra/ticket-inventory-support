@@ -25,12 +25,12 @@
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>${project.groupId}</groupId>
-			<artifactId>ticket-inventory-support-cached</artifactId>
+			<groupId>org.oxerr.ticket.inventory.support.cached</groupId>
+			<artifactId>ticket-inventory-support-cached-core</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>${project.groupId}</groupId>
+			<groupId>org.oxerr.ticket.inventory.support.cached</groupId>
 			<artifactId>ticket-inventory-support-cached-redisson</artifactId>
 			<version>${project.version}</version>
 		</dependency>

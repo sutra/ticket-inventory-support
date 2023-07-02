@@ -28,7 +28,6 @@
 	<modules>
 		<module>ticket-inventory-support-model</module>
 		<module>ticket-inventory-support-cached</module>
-		<module>ticket-inventory-support-cached-redisson</module>
 		<module>ticket-inventory-support-coverage</module>
 	</modules>
 	<build>

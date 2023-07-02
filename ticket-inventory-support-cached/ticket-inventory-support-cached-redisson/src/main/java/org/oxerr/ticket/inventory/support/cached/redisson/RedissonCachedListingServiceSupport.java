@@ -105,7 +105,7 @@ public abstract
 		final String lockName = String.format("%s:event:lock:%s", keyPrefix, event.getId());
 		final RReadWriteLock rwLock = redissonClient.getReadWriteLock(lockName);
 
-		rwLock.writeLock().lock();
+		rwLock.writeLock().lock(ttl(event), TimeUnit.MINUTES);
 
 		try {
 			this.doUpdateEvent(event);

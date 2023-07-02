@@ -7,9 +7,9 @@
 		https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
-		<groupId>org.oxerr.ticket.inventory.support</groupId>
-		<artifactId>ticket-inventory-support</artifactId>
-		<version>0.0.2</version>
+		<groupId>org.oxerr.ticket.inventory.support.cached</groupId>
+		<artifactId>ticket-inventory-support-cached</artifactId>
+		<version>0.0.4</version>
 	</parent>
 	<artifactId>ticket-inventory-support-cached-redisson</artifactId>
 	<name>Ticket Inventory Support - Cached - Redisson Implementation Support</name>
@@ -24,7 +24,7 @@
 		</dependency>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
-			<artifactId>ticket-inventory-support-cached</artifactId>
+			<artifactId>ticket-inventory-support-cached-core</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 	</dependencies>

@@ -6,7 +6,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.Temporal;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -14,6 +13,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -64,7 +65,7 @@ public abstract
 	 * the value is a map, with listing ID as key, and cached listing as value.
 	 * Event ID -> <Listing ID, CachedListing>
 	 */
-	private final RMapCache<P, Map<I, C>> listingsCache;
+	private final RMapCache<P, ConcurrentMap<I, C>> listingsCache;
 
 	/**
 	 * Constructs {@link RedissonCachedListingServiceSupport}.
@@ -91,7 +92,7 @@ public abstract
 	 *
 	 * @return the listing cache.
 	 */
-	public RMapCache<P, Map<I, C>> getListingCache() {
+	public RMapCache<P, ConcurrentMap<I, C>> getListingCache() {
 		return listingsCache;
 	}
 
@@ -116,43 +117,43 @@ public abstract
 	}
 
 	private void doUpdateEvent(final E event) {
-		final Map<I, C> cache = this.getOrCreateCache(event);
+		final ConcurrentMap<I, C> eventCache = this.getOrCreateEventCache(event);
 
 		try {
-			this.updateEvent(event, cache);
+			this.updateEvent(event, eventCache);
 		} finally {
-			this.saveCache(event, cache);
+			this.saveCache(event, eventCache);
 		}
 	}
 
-	private void updateEvent(final E event, final Map<I, C> cache) {
-		List<CompletableFuture<Void>> cfs = new ArrayList<>(cache.size());
+	private void updateEvent(final E event, final ConcurrentMap<I, C> eventCache) {
+		List<CompletableFuture<Void>> cfs = new ArrayList<>(eventCache.size());
 
 		// delete
-		cfs.addAll(this.delete(event, cache));
+		cfs.addAll(this.delete(event, eventCache));
 
 		// create/update
 		if (this.create) {
-			cfs.addAll(this.create(event, cache));
+			cfs.addAll(this.create(event, eventCache));
 		}
 
-		CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0])).join();
+		CompletableFuture.allOf(cfs.toArray(CompletableFuture[]::new)).join();
 	}
 
-	private List<CompletableFuture<Void>> delete(final E event, final Map<I, C> cache) {
+	private List<CompletableFuture<Void>> delete(final E event, final ConcurrentMap<I, C> eventCache) {
 		final Set<I> inventoryTicketIds = event
 			.getListings()
 			.stream()
 			.map(L::getId)
 			.collect(Collectors.toSet());
 
-		return cache
+		return eventCache
 			.entrySet()
 			.stream()
 			.filter(t -> this.shouldDelete(event, inventoryTicketIds, t.getKey(), t.getValue()))
 			.map(Map.Entry::getKey)
 			.distinct()
-			.map(ticketId -> this.deleteListingAsync(event, ticketId).thenAccept(r -> cache.remove(ticketId)))
+			.map(ticketId -> this.deleteListingAsync(event, ticketId).thenAccept(r -> eventCache.remove(ticketId)))
 			.collect(Collectors.toList());
 	}
 
@@ -165,26 +166,26 @@ public abstract
 		return !inventoryTicketIds.contains(ticketId);
 	}
 
-	private List<CompletableFuture<Void>> create(final E event, final Map<I, C> cache) {
+	private List<CompletableFuture<Void>> create(final E event, final ConcurrentMap<I, C> eventCache) {
 		final List<L> pendingCreateListings = event.getListings()
 			.stream()
-			.filter(listing -> this.shouldCreate(event, listing, cache.get(listing.getId())))
+			.filter(listing -> this.shouldCreate(event, listing, eventCache.get(listing.getId())))
 			.collect(Collectors.toList());
 
 		final Map<I, C> pendings = pendingCreateListings
 			.stream()
 			.collect(Collectors.toMap(L::getId, v -> this.toPending(event, v)));
 
-		cache.putAll(pendings);
+		eventCache.putAll(pendings);
 
 		// Make sure the cache is saved even if program is killed
-		this.saveCache(event, cache);
+		this.saveCache(event, eventCache);
 
 		// create
 		return pendingCreateListings.parallelStream()
 			.map(
 				listing -> this.createListingAsync(event, listing)
-					.thenAccept(r -> cache.put(listing.getId(), this.toListed(event, listing)))
+					.thenAccept(r -> eventCache.put(listing.getId(), this.toListed(event, listing)))
 			).collect(Collectors.toList());
 	}
 
@@ -198,14 +199,20 @@ public abstract
 			|| !cachedListing.getRequest().equals(listing.getRequest());
 	}
 
-	private Map<I, C> getOrCreateCache(final E event) {
-		Map<I, C> cache = this.listingsCache.get(event.getId());
-		return Optional.ofNullable(cache).orElseGet(HashMap::new);
+	private ConcurrentMap<I, C> getOrCreateEventCache(final E event) {
+		Map<I, C> legacyEventCache = this.listingsCache.get(event.getId());
+		ConcurrentMap<I, C> eventCache;
+		if (legacyEventCache instanceof ConcurrentMap) {
+			eventCache = (ConcurrentMap<I, C>) legacyEventCache;
+		} else {
+			eventCache = new ConcurrentHashMap<>(legacyEventCache);
+		}
+		return Optional.ofNullable(eventCache).orElseGet(ConcurrentHashMap::new);
 	}
 
-	private void saveCache(final E event, final Map<I, C> listings) {
+	private void saveCache(final E event, final ConcurrentMap<I, C> eventCache) {
 		final long ttl = ttl(event);
-		this.listingsCache.fastPut(event.getId(), listings, ttl, TimeUnit.MINUTES);
+		this.listingsCache.fastPut(event.getId(), eventCache, ttl, TimeUnit.MINUTES);
 	}
 
 	private long ttl(final E event) {
@@ -271,7 +278,7 @@ public abstract
 		return countListings(this.getListingCache());
 	}
 
-	private long countListings(final RMapCache<P, Map<I, C>> listingsCache) {
+	private long countListings(final RMapCache<P, ConcurrentMap<I, C>> listingsCache) {
 		return listingsCache.values()
 			.stream()
 			.map((Map<I, C> listings) -> listings.values().stream().filter(l -> l.getStatus() == Status.LISTED).count())

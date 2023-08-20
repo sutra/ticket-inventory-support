@@ -201,7 +201,7 @@ public abstract
 
 	private ConcurrentMap<I, C> getOrCreateEventCache(final E event) {
 		ConcurrentMap<I, C> eventCache = this.listingsCache.get(event.getId());
-		return Optional.ofNullable(eventCache).orElseGet(ConcurrentHashMap::new);
+		return Optional.ofNullable(eventCache).orElseGet(() -> new ConcurrentHashMap<>(event.getListings().size()));
 	}
 
 	private void saveCache(final E event, final ConcurrentMap<I, C> eventCache) {

@@ -5,19 +5,22 @@ import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.Temporal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.oxerr.ticket.inventory.support.Event;
 import org.oxerr.ticket.inventory.support.Listing;
 import org.oxerr.ticket.inventory.support.cached.CachedListingService;
@@ -44,8 +47,6 @@ public abstract
 	C extends CachedListing<R>
 >
 	implements CachedListingService<P, I, R, L, E> {
-
-	private final Logger log = LogManager.getLogger();
 
 	private final boolean create;
 
@@ -125,39 +126,34 @@ public abstract
 	}
 
 	private void updateEvent(final E event, final Map<I, C> cache) {
+		List<CompletableFuture<Void>> cfs = new ArrayList<>(cache.size());
+
 		// delete
-		this.delete(event, cache);
+		cfs.addAll(this.delete(event, cache));
 
 		// create/update
 		if (this.create) {
-			this.create(event, cache);
+			cfs.addAll(this.create(event, cache));
 		}
+
+		CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0])).join();
 	}
 
-	private void delete(final E event, final Map<I, C> cache) {
+	private List<CompletableFuture<Void>> delete(final E event, final Map<I, C> cache) {
 		final Set<I> inventoryTicketIds = event
 			.getListings()
 			.stream()
 			.map(L::getId)
 			.collect(Collectors.toSet());
 
-		final Set<I> pendingDeleteTicketIds = cache
+		return cache
 			.entrySet()
 			.stream()
 			.filter(t -> this.shouldDelete(event, inventoryTicketIds, t.getKey(), t.getValue()))
 			.map(Map.Entry::getKey)
-			.collect(Collectors.toSet());
-
-		for (final I ticketId : pendingDeleteTicketIds) {
-			log.trace("Deleting {}", ticketId);
-
-			try {
-				this.deleteListing(event, ticketId);
-				cache.remove(ticketId);
-			} catch (IOException e) {
-				log.warn("Delete ticket {} failed.", ticketId, e);
-			}
-		}
+			.distinct()
+			.map(ticketId -> this.deleteListingAsync(event, ticketId).thenAccept(r -> cache.remove(ticketId)))
+			.collect(Collectors.toList());
 	}
 
 	protected boolean shouldDelete(
@@ -169,7 +165,7 @@ public abstract
 		return !inventoryTicketIds.contains(ticketId);
 	}
 
-	private void create(final E event, final Map<I, C> cache) {
+	private List<CompletableFuture<Void>> create(final E event, final Map<I, C> cache) {
 		final List<L> pendingCreateListings = event.getListings()
 			.stream()
 			.filter(listing -> this.shouldCreate(event, listing, cache.get(listing.getId())))
@@ -185,16 +181,11 @@ public abstract
 		this.saveCache(event, cache);
 
 		// create
-		for (L listing : pendingCreateListings) {
-			log.trace("Creating {}", listing.getId());
-
-			try {
-				this.createListing(event, listing);
-				cache.put(listing.getId(), this.toListed(event, listing));
-			} catch (IOException e) {
-				log.warn("Create ticket {} failed.", listing.getId(), e);
-			}
-		}
+		return pendingCreateListings.parallelStream()
+			.map(
+				listing -> this.createListingAsync(event, listing)
+					.thenAccept(r -> cache.put(listing.getId(), this.toListed(event, listing)))
+			).collect(Collectors.toList());
 	}
 
 	protected boolean shouldCreate(
@@ -236,6 +227,37 @@ public abstract
 	protected abstract void deleteListing(E event, I ticketId) throws IOException;
 
 	protected abstract void createListing(E event, L listing) throws IOException;
+
+	protected CompletableFuture<Void> deleteListingAsync(E event, I ticketId) {
+		return callAsync(() -> {
+			this.deleteListing(event, ticketId);
+			return null;
+		});
+	}
+
+	protected CompletableFuture<Void> createListingAsync(E event, L listing) {
+		return callAsync(() -> {
+			this.createListing(event, listing);
+			return null;
+		});
+	}
+
+	private static <T> CompletableFuture<T> callAsync(Callable<T> callable) {
+		CompletableFuture<T> result = new CompletableFuture<>();
+		return result.completeAsync(toSupplier(callable, result));
+	}
+
+	private static <T> Supplier<T> toSupplier(Callable<T> callable, CompletableFuture<T> result) {
+		return () -> {
+			try {
+				return callable.call();
+			} catch (Exception ex) {
+				// wrap the exception just like CompletableFuture::supplyAsync does
+				result.completeExceptionally((ex instanceof CompletionException) ? ex : new CompletionException(ex));
+				return null;
+			}
+		};
+	}
 
 	protected abstract C toCached(E event, L listing, Status status);
 

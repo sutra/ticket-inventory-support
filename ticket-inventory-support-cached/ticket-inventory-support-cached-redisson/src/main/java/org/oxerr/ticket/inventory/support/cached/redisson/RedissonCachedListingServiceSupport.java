@@ -109,7 +109,7 @@ public abstract
 
 		rwLock.writeLock().lock();
 
-		long threadId = Thread.currentThread().getId();
+		final long threadId = Thread.currentThread().getId();
 		return this.doUpdateEvent(event).whenCompleteAsync((result, ex) -> rwLock.writeLock().unlockAsync(threadId));
 	}
 

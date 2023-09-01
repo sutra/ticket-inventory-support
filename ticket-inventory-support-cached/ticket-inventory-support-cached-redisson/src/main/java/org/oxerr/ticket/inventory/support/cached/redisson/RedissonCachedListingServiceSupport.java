@@ -103,30 +103,21 @@ public abstract
 	 * and create the listings that should be created.
 	 */
 	@Override
-	public void updateListings(final E event) {
+	public CompletableFuture<Void> updateListings(final E event) {
 		final String lockName = String.format("%s:event:lock:%s", keyPrefix, event.getId());
 		final RReadWriteLock rwLock = redissonClient.getReadWriteLock(lockName);
 
 		rwLock.writeLock().lock();
 
-		try {
-			this.doUpdateEvent(event);
-		} finally {
-			rwLock.writeLock().unlock();
-		}
+		return this.doUpdateEvent(event).whenCompleteAsync((result, ex) -> rwLock.writeLock().unlock());
 	}
 
-	private void doUpdateEvent(final E event) {
+	private CompletableFuture<Void> doUpdateEvent(final E event) {
 		final ConcurrentMap<I, C> eventCache = this.getOrCreateEventCache(event);
-
-		try {
-			this.updateEvent(event, eventCache);
-		} finally {
-			this.saveCache(event, eventCache);
-		}
+		return this.updateEvent(event, eventCache).thenRunAsync(() -> this.saveCache(event, eventCache));
 	}
 
-	private void updateEvent(final E event, final ConcurrentMap<I, C> eventCache) {
+	private CompletableFuture<Void> updateEvent(final E event, final ConcurrentMap<I, C> eventCache) {
 		List<CompletableFuture<Void>> cfs = new ArrayList<>(eventCache.size());
 
 		// delete
@@ -137,7 +128,7 @@ public abstract
 			cfs.addAll(this.create(event, eventCache));
 		}
 
-		CompletableFuture.allOf(cfs.toArray(CompletableFuture[]::new)).join();
+		return CompletableFuture.allOf(cfs.toArray(CompletableFuture[]::new));
 	}
 
 	private List<CompletableFuture<Void>> delete(final E event, final ConcurrentMap<I, C> eventCache) {

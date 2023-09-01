@@ -1,6 +1,7 @@
 package org.oxerr.ticket.inventory.support.cached;
 
 import java.io.Serializable;
+import java.util.concurrent.CompletableFuture;
 
 import org.oxerr.ticket.inventory.support.Event;
 import org.oxerr.ticket.inventory.support.Listing;
@@ -29,8 +30,9 @@ public interface CachedListingService<
 	 * that should be created/updated.
 	 *
 	 * @param event the event.
+	 * @return the result.
 	 */
-	void updateListings(E event);
+	CompletableFuture<Void> updateListings(E event);
 
 	/**
 	 * Returns the size of the cache.

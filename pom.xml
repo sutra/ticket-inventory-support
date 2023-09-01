@@ -88,7 +88,7 @@
 			<dependency>
 				<groupId>org.redisson</groupId>
 				<artifactId>redisson</artifactId>
-				<version>3.23.3</version>
+				<version>3.23.4</version>
 			</dependency>
 			<dependency>
 				<groupId>com.google.code.findbugs</groupId>

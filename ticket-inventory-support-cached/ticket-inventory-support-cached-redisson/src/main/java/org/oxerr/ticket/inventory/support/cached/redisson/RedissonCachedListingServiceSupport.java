@@ -109,7 +109,8 @@ public abstract
 
 		rwLock.writeLock().lock();
 
-		return this.doUpdateEvent(event).whenCompleteAsync((result, ex) -> rwLock.writeLock().unlock());
+		long threadId = Thread.currentThread().getId();
+		return this.doUpdateEvent(event).whenCompleteAsync((result, ex) -> rwLock.writeLock().unlockAsync(threadId));
 	}
 
 	private CompletableFuture<Void> doUpdateEvent(final E event) {

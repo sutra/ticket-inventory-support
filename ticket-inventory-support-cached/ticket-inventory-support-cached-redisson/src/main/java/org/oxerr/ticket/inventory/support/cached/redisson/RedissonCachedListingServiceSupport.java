@@ -15,6 +15,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -67,20 +69,33 @@ public abstract
 	 */
 	private final RMapCache<P, ConcurrentMap<I, C>> listingsCache;
 
-	/**
-	 * Constructs {@link RedissonCachedListingServiceSupport}.
-	 *
-	 * @param redissonClient the {@link RedissonClient}.
-	 * @param keyPrefix the key prefix for Redis entries(lock &amp; cache).
-	 * @param create indicates if listings should be created.
-	 */
+	private final Executor executor;
+
 	protected RedissonCachedListingServiceSupport(
 		final RedissonClient redissonClient,
 		final String keyPrefix,
 		final boolean create
 	) {
+		this(redissonClient, keyPrefix, ForkJoinPool.commonPool(), create);
+	}
+
+	/**
+	 * Constructs {@link RedissonCachedListingServiceSupport}.
+	 *
+	 * @param redissonClient the {@link RedissonClient}.
+	 * @param keyPrefix the key prefix for Redis entries(lock &amp; cache).
+	 * @param executor the executor
+	 * @param create indicates if listings should be created.
+	 */
+	protected RedissonCachedListingServiceSupport(
+		final RedissonClient redissonClient,
+		final String keyPrefix,
+		final Executor executor,
+		final boolean create
+	) {
 		this.redissonClient = redissonClient;
 		this.keyPrefix = keyPrefix;
+		this.executor = executor;
 		this.create = create;
 
 		final String cacheName = String.format("%s:listings", keyPrefix);
@@ -109,7 +124,8 @@ public abstract
 
 		rwLock.writeLock().lock();
 
-		return this.doUpdateEvent(event).whenCompleteAsync((result, ex) -> rwLock.writeLock().unlock());
+		final long threadId = Thread.currentThread().getId();
+		return this.doUpdateEvent(event).whenCompleteAsync((result, ex) -> rwLock.writeLock().unlockAsync(threadId));
 	}
 
 	private CompletableFuture<Void> doUpdateEvent(final E event) {
@@ -224,21 +240,23 @@ public abstract
 		return callAsync(() -> {
 			this.deleteListing(event, ticketId);
 			return null;
-		});
+		}, this.executor);
 	}
 
 	protected CompletableFuture<Void> createListingAsync(E event, L listing) {
 		return callAsync(() -> {
 			this.createListing(event, listing);
 			return null;
-		});
+		}, this.executor);
 	}
 
-	private static <T> CompletableFuture<T> callAsync(Callable<T> callable) {
+	// org.springframework.util.concurrent.FutureUtils
+	private static <T> CompletableFuture<T> callAsync(Callable<T> callable, Executor executor) {
 		CompletableFuture<T> result = new CompletableFuture<>();
-		return result.completeAsync(toSupplier(callable, result));
+		return result.completeAsync(toSupplier(callable, result), executor);
 	}
 
+	// org.springframework.util.concurrent.FutureUtils
 	private static <T> Supplier<T> toSupplier(Callable<T> callable, CompletableFuture<T> result) {
 		return () -> {
 			try {

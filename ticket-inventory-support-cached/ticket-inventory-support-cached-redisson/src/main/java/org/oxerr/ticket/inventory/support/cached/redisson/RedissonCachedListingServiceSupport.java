@@ -130,7 +130,7 @@ public abstract
 
 	private CompletableFuture<Void> doUpdateEvent(final E event) {
 		final ConcurrentMap<I, C> eventCache = this.getOrCreateEventCache(event);
-		return this.updateEvent(event, eventCache).thenRunAsync(() -> this.saveCache(event, eventCache));
+		return this.updateEvent(event, eventCache).whenComplete((result, ex) -> this.saveCache(event, eventCache));
 	}
 
 	private CompletableFuture<Void> updateEvent(final E event, final ConcurrentMap<I, C> eventCache) {

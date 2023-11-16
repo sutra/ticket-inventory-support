@@ -113,7 +113,7 @@ public abstract
 
 	/**
 	 * Updates the listings of the events.
-	 * 
+	 *
 	 * Deletes all listings that should be deleted,
 	 * and create the listings that should be created.
 	 */
@@ -282,10 +282,40 @@ public abstract
 	}
 
 	private long countListings(final RMapCache<P, ConcurrentMap<I, C>> listingsCache) {
+		long count = 0;
+
+		for (var eventEntry : listingsCache.entrySet()) {
+			P eventId;
+			ConcurrentMap<I, C> event;
+			eventId = eventEntry.getKey();
+
+			try {
+				event = eventEntry.getValue();
+			} catch (com.esotericsoftware.kryo.io.KryoBufferUnderflowException e) {
+				listingsCache.remove(eventId);
+				continue;
+			}
+
+			for (var listingEntry : event.entrySet()) {
+				var listingId = listingEntry.getKey();
+				try {
+					var cachedListing = listingEntry.getValue();
+					if (cachedListing.getStatus() == Status.LISTED) {
+						count++;
+					}
+				} catch (com.esotericsoftware.kryo.io.KryoBufferUnderflowException e) {
+					event.remove(listingId);
+					continue;
+				}
+			}
+		}
+		return count;
+		/*
 		return listingsCache.values()
 			.stream()
 			.map((Map<I, C> listings) -> listings.values().stream().filter(l -> l.getStatus() == Status.LISTED).count())
 			.reduce(0L, Long::sum);
+		*/
 	}
 
 }

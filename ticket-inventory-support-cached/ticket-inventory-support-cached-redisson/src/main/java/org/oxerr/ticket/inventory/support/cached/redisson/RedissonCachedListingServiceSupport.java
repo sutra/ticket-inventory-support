@@ -79,6 +79,15 @@ public abstract
 		this(redissonClient, keyPrefix, ForkJoinPool.commonPool(), create);
 	}
 
+	protected RedissonCachedListingServiceSupport(
+		final RedissonClient redissonClient,
+		final String keyPrefix,
+		final Executor executor,
+		final boolean create
+	) {
+		this(redissonClient, keyPrefix, executor, create, redissonClient.getMapCache(String.format("%s:listings", keyPrefix)));
+	}
+
 	/**
 	 * Constructs {@link RedissonCachedListingServiceSupport}.
 	 *
@@ -86,20 +95,21 @@ public abstract
 	 * @param keyPrefix the key prefix for Redis entries(lock &amp; cache).
 	 * @param executor the executor
 	 * @param create indicates if listings should be created.
+	 * @param listingCache the listing cache.
 	 */
 	protected RedissonCachedListingServiceSupport(
 		final RedissonClient redissonClient,
 		final String keyPrefix,
 		final Executor executor,
-		final boolean create
+		final boolean create,
+		final RMapCache<P, ConcurrentMap<I, C>> listingCache
 	) {
 		this.redissonClient = redissonClient;
 		this.keyPrefix = keyPrefix;
 		this.executor = executor;
 		this.create = create;
 
-		final String cacheName = String.format("%s:listings", keyPrefix);
-		this.listingsCache = redissonClient.getMapCache(cacheName);
+		this.listingsCache = listingCache;
 	}
 
 	/**

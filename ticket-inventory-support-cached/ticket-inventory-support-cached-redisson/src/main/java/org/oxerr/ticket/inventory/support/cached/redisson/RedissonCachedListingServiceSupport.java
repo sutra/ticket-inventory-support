@@ -95,21 +95,21 @@ public abstract
 	 * @param keyPrefix the key prefix for Redis entries(lock &amp; cache).
 	 * @param executor the executor
 	 * @param create indicates if listings should be created.
-	 * @param listingCache the listing cache.
+	 * @param listingsCache the listing cache.
 	 */
 	protected RedissonCachedListingServiceSupport(
 		final RedissonClient redissonClient,
 		final String keyPrefix,
 		final Executor executor,
 		final boolean create,
-		final RMapCache<P, ConcurrentMap<I, C>> listingCache
+		final RMapCache<P, ConcurrentMap<I, C>> listingsCache
 	) {
 		this.redissonClient = redissonClient;
 		this.keyPrefix = keyPrefix;
 		this.executor = executor;
 		this.create = create;
 
-		this.listingsCache = listingCache;
+		this.listingsCache = listingsCache;
 	}
 
 	/**

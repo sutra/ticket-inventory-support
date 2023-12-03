@@ -2,22 +2,17 @@ package org.oxerr.ticket.inventory.support.cached.redisson;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -27,14 +22,14 @@ import javax.annotation.Nullable;
 import org.oxerr.ticket.inventory.support.Event;
 import org.oxerr.ticket.inventory.support.Listing;
 import org.oxerr.ticket.inventory.support.cached.CachedListingService;
-import org.redisson.api.RMapCache;
-import org.redisson.api.RReadWriteLock;
+import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
 
 /**
  * The {@link CachedListingService} implementation using Redisson.
  *
  * @param <P> the type of the event ID.
+ * @param <I> the type of the listing ID.
  * @param <R> the type of the create listing request.
  * @param <L> the type of the {@link Listing}.
  * @param <E> the type of the {@link Event}.
@@ -53,72 +48,41 @@ public abstract
 
 	private final boolean create;
 
-	private final RedissonClient redissonClient;
+	private final RedissonClient redisson;
 
 	/**
-	 * The key prefix for Redis entries(lock &amp; cache).
+	 * The key prefix for Redis entries.
 	 */
 	private final String keyPrefix;
-
-	/**
-	 * The listing cache.
-	 *
-	 * The key is event ID,
-	 * the value is a map, with listing ID as key, and cached listing as value.
-	 * Event ID -> <Listing ID, CachedListing>
-	 */
-	private final RMapCache<P, ConcurrentMap<I, C>> listingsCache;
 
 	private final Executor executor;
 
 	protected RedissonCachedListingServiceSupport(
-		final RedissonClient redissonClient,
+		final RedissonClient redisson,
 		final String keyPrefix,
 		final boolean create
 	) {
-		this(redissonClient, keyPrefix, ForkJoinPool.commonPool(), create);
-	}
-
-	protected RedissonCachedListingServiceSupport(
-		final RedissonClient redissonClient,
-		final String keyPrefix,
-		final Executor executor,
-		final boolean create
-	) {
-		this(redissonClient, keyPrefix, executor, create, redissonClient.getMapCache(String.format("%s:listings", keyPrefix)));
+		this(redisson, keyPrefix, ForkJoinPool.commonPool(), create);
 	}
 
 	/**
 	 * Constructs {@link RedissonCachedListingServiceSupport}.
 	 *
-	 * @param redissonClient the {@link RedissonClient}.
-	 * @param keyPrefix the key prefix for Redis entries(lock &amp; cache).
+	 * @param redisson the {@link RedissonClient}.
+	 * @param keyPrefix the key prefix for Redis entries.
 	 * @param executor the executor
 	 * @param create indicates if listings should be created.
-	 * @param listingsCache the listing cache.
 	 */
 	protected RedissonCachedListingServiceSupport(
-		final RedissonClient redissonClient,
+		final RedissonClient redisson,
 		final String keyPrefix,
 		final Executor executor,
-		final boolean create,
-		final RMapCache<P, ConcurrentMap<I, C>> listingsCache
+		final boolean create
 	) {
-		this.redissonClient = redissonClient;
+		this.redisson = redisson;
 		this.keyPrefix = keyPrefix;
 		this.executor = executor;
 		this.create = create;
-
-		this.listingsCache = listingsCache;
-	}
-
-	/**
-	 * Returns the listing cache.
-	 *
-	 * @return the listing cache.
-	 */
-	public RMapCache<P, ConcurrentMap<I, C>> getListingCache() {
-		return listingsCache;
 	}
 
 	/**
@@ -129,18 +93,12 @@ public abstract
 	 */
 	@Override
 	public CompletableFuture<Void> updateListings(final E event) {
-		final String lockName = String.format("%s:event:lock:%s", keyPrefix, event.getId());
-		final RReadWriteLock rwLock = redissonClient.getReadWriteLock(lockName);
-
-		rwLock.writeLock().lock();
-
-		final long threadId = Thread.currentThread().getId();
-		return this.doUpdateEvent(event).whenCompleteAsync((result, ex) -> rwLock.writeLock().unlockAsync(threadId));
+		return this.doUpdateEvent(event);
 	}
 
 	private CompletableFuture<Void> doUpdateEvent(final E event) {
-		final ConcurrentMap<I, C> eventCache = this.getOrCreateEventCache(event);
-		return this.updateEvent(event, eventCache).whenComplete((result, ex) -> this.saveCache(event, eventCache));
+		final ConcurrentMap<I, C> eventCache = this.getEventCache(event);
+		return this.updateEvent(event, eventCache);
 	}
 
 	private CompletableFuture<Void> updateEvent(final E event, final ConcurrentMap<I, C> eventCache) {
@@ -195,9 +153,6 @@ public abstract
 
 		eventCache.putAll(pendings);
 
-		// Make sure the cache is saved even if program is killed
-		this.saveCache(event, eventCache);
-
 		// create
 		return pendingCreateListings.parallelStream()
 			.map(
@@ -216,22 +171,15 @@ public abstract
 			|| !cachedListing.getRequest().equals(listing.getRequest());
 	}
 
-	private ConcurrentMap<I, C> getOrCreateEventCache(final E event) {
-		ConcurrentMap<I, C> eventCache = this.listingsCache.get(event.getId());
-		return Optional.ofNullable(eventCache).orElseGet(() -> new ConcurrentHashMap<>(event.getListings().size()));
+	private RMap<I, C> getEventCache(final E event) {
+		var name = String.format("%s:listings:%s", keyPrefix, event.getId());
+		RMap<I, C> eventCache = this.redisson.getMap(name);
+		eventCache.expire(this.cacheEndDate(event));
+		return eventCache;
 	}
 
-	private void saveCache(final E event, final ConcurrentMap<I, C> eventCache) {
-		final long ttl = ttl(event);
-		this.listingsCache.fastPut(event.getId(), eventCache, ttl, TimeUnit.MINUTES);
-	}
-
-	private long ttl(final E event) {
-		return Math.max(1, Duration.between(Instant.now(), this.cacheEndDate(event)).toMinutes());
-	}
-
-	protected Temporal cacheEndDate(final E event) {
-		return event.getStartDate();
+	protected Instant cacheEndDate(final E event) {
+		return event.getStartDate().toInstant();
 	}
 
 	private C toPending(final E event, final L listing) {
@@ -283,49 +231,21 @@ public abstract
 
 	@Override
 	public long cacheSize() {
-		return this.getListingCache().size();
+		var keyPattern = this.getKeyPattern();
+		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern).count();
 	}
 
 	@Override
 	public long listedCount() {
-		return countListings(this.getListingCache());
+		var keyPattern = this.getKeyPattern();
+		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern).map(key -> {
+			RMap<I, C> cache = this.redisson.getMap(key);
+			return cache.values().stream().filter(l -> l.getStatus() == Status.LISTED).count();
+		}).reduce(0L, Long::sum);
 	}
 
-	private long countListings(final RMapCache<P, ConcurrentMap<I, C>> listingsCache) {
-		long count = 0;
-
-		for (var eventEntry : listingsCache.entrySet()) {
-			P eventId;
-			ConcurrentMap<I, C> event;
-			eventId = eventEntry.getKey();
-
-			try {
-				event = eventEntry.getValue();
-			} catch (com.esotericsoftware.kryo.io.KryoBufferUnderflowException e) {
-				listingsCache.remove(eventId);
-				continue;
-			}
-
-			for (var listingEntry : event.entrySet()) {
-				var listingId = listingEntry.getKey();
-				try {
-					var cachedListing = listingEntry.getValue();
-					if (cachedListing.getStatus() == Status.LISTED) {
-						count++;
-					}
-				} catch (com.esotericsoftware.kryo.io.KryoBufferUnderflowException e) {
-					event.remove(listingId);
-					continue;
-				}
-			}
-		}
-		return count;
-		/*
-		return listingsCache.values()
-			.stream()
-			.map((Map<I, C> listings) -> listings.values().stream().filter(l -> l.getStatus() == Status.LISTED).count())
-			.reduce(0L, Long::sum);
-		*/
+	private String getKeyPattern() {
+		return String.format("%s:listings:*", this.keyPrefix);
 	}
 
 }

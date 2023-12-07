@@ -10,11 +10,11 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -48,14 +48,14 @@ public abstract
 
 	private final boolean create;
 
-	private final RedissonClient redisson;
+	protected final RedissonClient redisson;
 
 	/**
 	 * The key prefix for Redis entries.
 	 */
-	private final String keyPrefix;
+	protected final String keyPrefix;
 
-	private final Executor executor;
+	protected final Executor executor;
 
 	protected RedissonCachedListingServiceSupport(
 		final RedissonClient redisson,
@@ -93,72 +93,59 @@ public abstract
 	 */
 	@Override
 	public CompletableFuture<Void> updateListings(final E event) {
-		return this.doUpdateEvent(event);
+		var cache = this.getCache(event);
+		return this.updateEvent(event, cache);
 	}
 
-	private CompletableFuture<Void> doUpdateEvent(final E event) {
-		final ConcurrentMap<I, C> eventCache = this.getEventCache(event);
-		return this.updateEvent(event, eventCache);
-	}
-
-	private CompletableFuture<Void> updateEvent(final E event, final ConcurrentMap<I, C> eventCache) {
-		List<CompletableFuture<Void>> cfs = new ArrayList<>(eventCache.size());
+	private CompletableFuture<Void> updateEvent(final E event, final RMap<I, C> cache) {
+		List<CompletableFuture<Void>> cfs = new ArrayList<>(cache.size());
 
 		// delete
-		cfs.addAll(this.delete(event, eventCache));
+		cfs.addAll(this.delete(event, cache));
 
 		// create/update
 		if (this.create) {
-			cfs.addAll(this.create(event, eventCache));
+			cfs.addAll(this.create(event, cache));
 		}
 
 		return CompletableFuture.allOf(cfs.toArray(CompletableFuture[]::new));
 	}
 
-	private List<CompletableFuture<Void>> delete(final E event, final ConcurrentMap<I, C> eventCache) {
-		final Set<I> inventoryTicketIds = event
-			.getListings()
-			.stream()
-			.map(L::getId)
-			.collect(Collectors.toSet());
-
-		return eventCache
-			.entrySet()
-			.stream()
-			.filter(t -> this.shouldDelete(event, inventoryTicketIds, t.getKey(), t.getValue()))
-			.map(Map.Entry::getKey)
-			.distinct()
-			.map(ticketId -> this.deleteListingAsync(event, ticketId).thenAccept(r -> eventCache.remove(ticketId)))
-			.collect(Collectors.toList());
-	}
-
-	protected boolean shouldDelete(
-		@Nonnull final E event,
-		@Nonnull final Set<I> inventoryTicketIds,
-		@Nonnull final I ticketId,
-		@Nonnull final C cachedListing
-	) {
-		return !inventoryTicketIds.contains(ticketId);
-	}
-
-	private List<CompletableFuture<Void>> create(final E event, final ConcurrentMap<I, C> eventCache) {
+	private List<CompletableFuture<Void>> create(final E event, final RMap<I, C> cache) {
 		final List<L> pendingCreateListings = event.getListings()
 			.stream()
-			.filter(listing -> this.shouldCreate(event, listing, eventCache.get(listing.getId())))
+			.filter(listing -> this.shouldCreate(event, listing, cache.get(listing.getId())))
 			.collect(Collectors.toList());
 
 		final Map<I, C> pendings = pendingCreateListings
 			.stream()
 			.collect(Collectors.toMap(L::getId, v -> this.toPending(event, v)));
 
-		eventCache.putAll(pendings);
+		cache.putAll(pendings);
 
 		// create
 		return pendingCreateListings.parallelStream()
 			.map(
 				listing -> this.createListingAsync(event, listing)
-					.thenAccept(r -> eventCache.put(listing.getId(), this.toListed(event, listing)))
+					.thenAccept(r -> cache.put(listing.getId(), this.toListed(event, listing)))
 			).collect(Collectors.toList());
+	}
+
+	private List<CompletableFuture<Void>> delete(final E event, final RMap<I, C> cache) {
+		final Set<I> inventoryTicketIds = event
+			.getListings()
+			.stream()
+			.map(L::getId)
+			.collect(Collectors.toSet());
+
+		return cache
+			.entrySet()
+			.stream()
+			.filter(t -> this.shouldDelete(event, inventoryTicketIds, t.getKey(), t.getValue()))
+			.map(Map.Entry::getKey)
+			.distinct()
+			.map(ticketId -> this.deleteListingAsync(event, ticketId).thenAccept(r -> cache.remove(ticketId)))
+			.collect(Collectors.toList());
 	}
 
 	protected boolean shouldCreate(
@@ -171,15 +158,13 @@ public abstract
 			|| !cachedListing.getRequest().equals(listing.getRequest());
 	}
 
-	private RMap<I, C> getEventCache(final E event) {
-		var name = String.format("%s:listings:%s", keyPrefix, event.getId());
-		RMap<I, C> eventCache = this.redisson.getMap(name);
-		eventCache.expire(this.cacheEndDate(event));
-		return eventCache;
-	}
-
-	protected Instant cacheEndDate(final E event) {
-		return event.getStartDate().toInstant();
+	protected boolean shouldDelete(
+		@Nonnull final E event,
+		@Nonnull final Set<I> inventoryTicketIds,
+		@Nonnull final I ticketId,
+		@Nonnull final C cachedListing
+	) {
+		return !inventoryTicketIds.contains(ticketId);
 	}
 
 	private C toPending(final E event, final L listing) {
@@ -190,16 +175,7 @@ public abstract
 		return toCached(event, listing, Status.LISTED);
 	}
 
-	protected abstract void deleteListing(E event, I ticketId) throws IOException;
-
-	protected abstract void createListing(E event, L listing) throws IOException;
-
-	protected CompletableFuture<Void> deleteListingAsync(E event, I ticketId) {
-		return callAsync(() -> {
-			this.deleteListing(event, ticketId);
-			return null;
-		}, this.executor);
-	}
+	protected abstract C toCached(E event, L listing, Status status);
 
 	protected CompletableFuture<Void> createListingAsync(E event, L listing) {
 		return callAsync(() -> {
@@ -208,14 +184,66 @@ public abstract
 		}, this.executor);
 	}
 
+	protected CompletableFuture<Void> deleteListingAsync(E event, I ticketId) {
+		return callAsync(() -> {
+			this.deleteListing(event, ticketId);
+			return null;
+		}, this.executor);
+	}
+
+	protected abstract void createListing(E event, L listing) throws IOException;
+
+	protected abstract void deleteListing(E event, I ticketId) throws IOException;
+
+	@Override
+	public long getCacheSize() {
+		return this.getCacheNamesStream().count();
+	}
+
+	@Override
+	public long getListedCount() {
+		return this.getCacheNamesStream().map(key -> {
+			RMap<I, C> cache = this.redisson.getMap(key);
+			return cache.values().stream().filter(l -> l.getStatus() == Status.LISTED).count();
+		}).reduce(0L, Long::sum);
+	}
+
+	protected RMap<I, C> getCache(final E event) {
+		var name = this.getCacheName(event);
+		var cache = this.getCache(name);
+		cache.expire(this.getCacheExpireDate(event));
+		return cache;
+	}
+
+	protected RMap<I, C> getCache(final String name) {
+		return this.redisson.getMap(name);
+	}
+
+	protected Instant getCacheExpireDate(final E event) {
+		return event.getStartDate().toInstant();
+	}
+
+	protected Stream<String> getCacheNamesStream() {
+		var keyPattern = this.getCacheNamePattern();
+		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern);
+	}
+
+	protected String getCacheName(final E event) {
+		return String.format("%s:listings:%s", keyPrefix, event.getId());
+	}
+
+	protected String getCacheNamePattern() {
+		return String.format("%s:listings:*", this.keyPrefix);
+	}
+
 	// org.springframework.util.concurrent.FutureUtils
-	private static <T> CompletableFuture<T> callAsync(Callable<T> callable, Executor executor) {
+	protected static <T> CompletableFuture<T> callAsync(Callable<T> callable, Executor executor) {
 		CompletableFuture<T> result = new CompletableFuture<>();
 		return result.completeAsync(toSupplier(callable, result), executor);
 	}
 
 	// org.springframework.util.concurrent.FutureUtils
-	private static <T> Supplier<T> toSupplier(Callable<T> callable, CompletableFuture<T> result) {
+	protected static <T> Supplier<T> toSupplier(Callable<T> callable, CompletableFuture<T> result) {
 		return () -> {
 			try {
 				return callable.call();
@@ -225,27 +253,6 @@ public abstract
 				return null;
 			}
 		};
-	}
-
-	protected abstract C toCached(E event, L listing, Status status);
-
-	@Override
-	public long cacheSize() {
-		var keyPattern = this.getKeyPattern();
-		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern).count();
-	}
-
-	@Override
-	public long listedCount() {
-		var keyPattern = this.getKeyPattern();
-		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern).map(key -> {
-			RMap<I, C> cache = this.redisson.getMap(key);
-			return cache.values().stream().filter(l -> l.getStatus() == Status.LISTED).count();
-		}).reduce(0L, Long::sum);
-	}
-
-	private String getKeyPattern() {
-		return String.format("%s:listings:*", this.keyPrefix);
 	}
 
 }

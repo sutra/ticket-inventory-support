@@ -39,13 +39,23 @@ public interface CachedListingService<
 	 *
 	 * @return the size of the cache.
 	 */
-	long cacheSize();
+	long getCacheSize();
+
+	@Deprecated(since = "3.0.1", forRemoval = true)
+	default long cacheSize() {
+		return this.getCacheSize();
+	}
 
 	/**
 	 * Returns the listing count which status is LISTED.
 	 *
 	 * @return the listing count which status is LISTED.
 	 */
-	long listedCount();
+	long getListedCount();
+
+	@Deprecated(since = "3.0.1", forRemoval = true)
+	default long listedCount() {
+		return this.getListedCount();
+	}
 
 }

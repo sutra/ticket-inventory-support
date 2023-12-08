@@ -9,7 +9,7 @@
 	<parent>
 		<groupId>org.oxerr.ticket.inventory.support.cached</groupId>
 		<artifactId>ticket-inventory-support-cached</artifactId>
-		<version>3.0.0</version>
+		<version>3.1.0</version>
 	</parent>
 	<artifactId>ticket-inventory-support-cached-redisson</artifactId>
 	<name>Ticket Inventory Support - Cached - Redisson Implementation Support</name>

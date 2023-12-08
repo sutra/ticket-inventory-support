@@ -223,6 +223,11 @@ public abstract
 		return event.getStartDate().toInstant();
 	}
 
+	@Deprecated(since = "3.0.1", forRemoval = true)
+	protected Instant cacheEndDate(final E event) {
+		return this.getCacheExpireDate(event);
+	}
+
 	protected Stream<String> getCacheNamesStream() {
 		var keyPattern = this.getCacheNamePattern();
 		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern);

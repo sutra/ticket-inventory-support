@@ -178,17 +178,17 @@ public abstract
 	protected abstract C toCached(E event, L listing, Status status);
 
 	protected CompletableFuture<Void> createListingAsync(E event, L listing) {
-		return callAsync(() -> {
+		return this.callAsync(() -> {
 			this.createListing(event, listing);
 			return null;
-		}, this.executor);
+		});
 	}
 
 	protected CompletableFuture<Void> deleteListingAsync(E event, I ticketId) {
-		return callAsync(() -> {
+		return this.callAsync(() -> {
 			this.deleteListing(event, ticketId);
 			return null;
-		}, this.executor);
+		});
 	}
 
 	protected abstract void createListing(E event, L listing) throws IOException;
@@ -239,6 +239,10 @@ public abstract
 
 	protected String getCacheNamePattern() {
 		return String.format("%s:listings:*", this.keyPrefix);
+	}
+
+	protected <T> CompletableFuture<T> callAsync(Callable<T> callable) {
+		return callAsync(callable, this.executor);
 	}
 
 	// org.springframework.util.concurrent.FutureUtils

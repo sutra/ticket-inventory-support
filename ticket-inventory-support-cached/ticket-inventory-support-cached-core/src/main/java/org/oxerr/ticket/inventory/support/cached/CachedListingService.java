@@ -36,7 +36,7 @@ public interface CachedListingService<
 	CompletableFuture<Void> updateListings(E event);
 
 	/**
-	 * Get all cache names using Stream.
+	 * Gets all cache names using Stream.
 	 *
 	 * @return the cache names.
 	 */

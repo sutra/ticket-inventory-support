@@ -2,6 +2,7 @@ package org.oxerr.ticket.inventory.support.cached;
 
 import java.io.Serializable;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 
 import org.oxerr.ticket.inventory.support.Event;
 import org.oxerr.ticket.inventory.support.Listing;
@@ -24,15 +25,30 @@ public interface CachedListingService<
 > {
 
 	/**
-	 * Update the listings of the event.
+	 * Updates the listings of the event.
 	 *
-	 * Delete all listings that should be deleted, create/update all listings
+	 * Deletes all listings that should be deleted, creates/updates all listings
 	 * that should be created/updated.
 	 *
 	 * @param event the event.
 	 * @return the result.
 	 */
 	CompletableFuture<Void> updateListings(E event);
+
+	/**
+	 * Gets all cache names using Stream.
+	 *
+	 * @return the cache names.
+	 */
+	Stream<String> getCacheNamesStream();
+
+	/**
+	 * Gets all cache names using Stream.
+	 *
+	 * @param count keys loaded per request to cache system.
+	 * @return the cache names.
+	 */
+	Stream<String> getCacheNamesStream(int count);
 
 	/**
 	 * Returns the size of the cache.

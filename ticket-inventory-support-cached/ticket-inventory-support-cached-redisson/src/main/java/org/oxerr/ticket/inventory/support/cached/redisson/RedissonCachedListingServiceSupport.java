@@ -228,9 +228,13 @@ public abstract
 		return this.getCacheExpireDate(event);
 	}
 
-	protected Stream<String> getCacheNamesStream() {
+	public Stream<String> getCacheNamesStream() {
+		return this.getCacheNamesStream(10);
+	}
+
+	public Stream<String> getCacheNamesStream(int count) {
 		var keyPattern = this.getCacheNamePattern();
-		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern);
+		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern, count);
 	}
 
 	protected String getCacheName(final E event) {

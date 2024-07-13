@@ -210,15 +210,21 @@ public abstract
 
 	protected RMap<I, C> getCache(final E event) {
 		var name = this.getCacheName(event);
-		var cache = this.getCache(name);
-		cache.expire(this.getCacheExpireDate(event));
-		return cache;
+		return this.getCache(name);
 	}
 
 	protected RMap<I, C> getCache(final String name) {
 		return this.redisson.getMap(name);
 	}
 
+	/**
+	 * For Redisson Map no need to set the expiration date.
+	 * When the Map is empty, it is totally deleted from Redis.
+	 *
+	 * @param event the event.
+	 * @return the expiration date.
+	 */
+	@Deprecated(since = "3.3.1", forRemoval = true)
 	protected Instant getCacheExpireDate(final E event) {
 		return event.getStartDate().toInstant();
 	}

@@ -224,7 +224,7 @@ public abstract
 	 * @param event the event.
 	 * @return the expiration date.
 	 */
-	@Deprecated(since = "3.3.0", forRemoval = true)
+	@Deprecated(since = "3.3.1", forRemoval = true)
 	protected Instant getCacheExpireDate(final E event) {
 		return event.getStartDate().toInstant();
 	}

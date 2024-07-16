@@ -106,4 +106,10 @@
 		<system>GitHub</system>
 		<url>https://github.com/sutra/ticket-inventory-support/issues</url>
 	</issueManagement>
+	<distributionManagement>
+		<site>
+			<id>oxerr.org</id>
+			<url>scp://oxerr.org/usr/local/www/ticket-inventory-support/</url>
+		</site>
+	</distributionManagement>
 </project>

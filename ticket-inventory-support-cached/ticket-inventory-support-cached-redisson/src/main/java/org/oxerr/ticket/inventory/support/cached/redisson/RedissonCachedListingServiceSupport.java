@@ -100,7 +100,9 @@ public abstract
 
 	@Override
 	public boolean isListed(E event, L listing) {
-		return this.getCache(event).get(listing.getId()).getStatus() == Status.LISTED;
+		return Optional.ofNullable(this.getCache(event))
+			.map(c -> c.get(listing.getId()))
+			.map(C::getStatus).orElse(null) == Status.LISTED;
 	}
 
 	private CompletableFuture<Void> updateEvent(final E event, final RMap<I, C> cache) {

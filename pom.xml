@@ -18,7 +18,7 @@
 		Ticket Inventory Support - Support classes for ticket inventory.
 	</description>
 	<packaging>pom</packaging>
-	<version>3.3.3</version>
+	<version>4.0.0</version>
 	<url>https://www.oxerr.org/ticket-inventory-support</url>
 	<inceptionYear>2023</inceptionYear>
 	<properties>
@@ -106,4 +106,10 @@
 		<system>GitHub</system>
 		<url>https://github.com/sutra/ticket-inventory-support/issues</url>
 	</issueManagement>
+	<distributionManagement>
+		<site>
+			<id>oxerr.org</id>
+			<url>scp://oxerr.org/usr/local/www/ticket-inventory-support/</url>
+		</site>
+	</distributionManagement>
 </project>

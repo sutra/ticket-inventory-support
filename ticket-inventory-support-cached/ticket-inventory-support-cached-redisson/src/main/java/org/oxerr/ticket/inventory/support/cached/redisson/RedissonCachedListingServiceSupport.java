@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -112,13 +113,11 @@ public abstract
 	}
 
 	private List<CompletableFuture<Void>> create(final E event, final RMap<I, C> cache) {
-		final List<L> pendingCreateListings = event.getListings()
-			.stream()
+		final List<L> pendingCreateListings = event.getListings().parallelStream()
 			.filter(listing -> this.shouldCreate(event, listing, cache.get(listing.getId())))
 			.collect(Collectors.toList());
 
-		final Map<I, C> pendings = pendingCreateListings
-			.stream()
+		final Map<I, C> pendings = pendingCreateListings.parallelStream()
 			.collect(Collectors.toMap(L::getId, v -> this.toPending(event, v)));
 
 		cache.putAll(pendings);
@@ -127,23 +126,30 @@ public abstract
 		return pendingCreateListings.parallelStream()
 			.map(
 				listing -> this.createListingAsync(event, listing)
-					.thenAccept(r -> cache.put(listing.getId(), this.toListed(event, listing)))
+					.thenAccept((Boolean r) -> {
+						if (r.booleanValue()) {
+							cache.put(listing.getId(), this.toListed(event, listing));
+						}
+					})
 			).collect(Collectors.toList());
 	}
 
 	private List<CompletableFuture<Void>> delete(final E event, final RMap<I, C> cache) {
-		final Set<I> inventoryTicketIds = event
-			.getListings()
-			.stream()
-			.map(L::getId)
-			.collect(Collectors.toSet());
+		final Set<I> inventoryTicketIds = event.getListings().parallelStream()
+			.map(L::getId).collect(Collectors.toSet());
 
-		return cache
-			.entrySet()
-			.stream()
+		final Map<I, C> pendings = cache.entrySet().parallelStream()
 			.filter(t -> this.shouldDelete(event, inventoryTicketIds, t.getKey(), t.getValue()))
-			.map(Map.Entry::getKey)
-			.distinct()
+			.collect(Collectors.toMap(Map.Entry::getKey, e -> {
+				var v = e.getValue();
+				v.setStatus(Status.PENDING_DELETE);
+				return v;
+			}));
+
+		cache.putAll(pendings);
+
+		// delete
+		return pendings.entrySet().parallelStream().map(Map.Entry::getKey).distinct()
 			.map(ticketId -> this.deleteListingAsync(event, ticketId).thenAccept(r -> cache.remove(ticketId)))
 			.collect(Collectors.toList());
 	}
@@ -177,17 +183,22 @@ public abstract
 
 	protected abstract C toCached(E event, L listing, Status status);
 
-	protected CompletableFuture<Void> createListingAsync(E event, L listing) {
+	private CompletableFuture<Boolean> createListingAsync(E event, L listing) {
 		return this.callAsync(() -> {
-			this.createListing(event, listing);
-			return null;
+			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_LIST) {
+				// If it is still in PENDING_LIST status, create the listing.
+				this.createListing(event, listing);
+				return true;
+			} else {
+				return false;
+			}
 		});
 	}
 
-	protected CompletableFuture<Void> deleteListingAsync(E event, I ticketId) {
+	private CompletableFuture<Boolean> deleteListingAsync(E event, I ticketId) {
 		return this.callAsync(() -> {
 			this.deleteListing(event, ticketId);
-			return null;
+			return true;
 		});
 	}
 
@@ -204,7 +215,7 @@ public abstract
 	public long getListedCount() {
 		return this.getCacheNamesStream().map(key -> {
 			RMap<I, C> cache = this.redisson.getMap(key);
-			return cache.values().stream().filter(l -> l.getStatus() == Status.LISTED).count();
+			return cache.values().parallelStream().filter(l -> l.getStatus() == Status.LISTED).count();
 		}).reduce(0L, Long::sum);
 	}
 

@@ -36,6 +36,17 @@ public interface CachedListingService<
 	CompletableFuture<Void> updateListings(E event);
 
 	/**
+	 * Returns {@code true} if, and only if, the listing is listed.
+	 *
+	 * @param event the event.
+	 * @param listing the listing.
+	 * @return {@code true} if the listing is listed, otherwise {@code false}.
+	 *
+	 * @since 4.1.0
+	 */
+	boolean isListed(E event, L listing);
+
+	/**
 	 * Gets all cache names using Stream.
 	 *
 	 * @return the cache names.
@@ -63,9 +74,9 @@ public interface CachedListingService<
 	}
 
 	/**
-	 * Returns the listing count which status is LISTED.
+	 * Returns the listing count which status is listed.
 	 *
-	 * @return the listing count which status is LISTED.
+	 * @return the listing count which status is listed.
 	 */
 	long getListedCount();
 

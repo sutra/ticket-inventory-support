@@ -98,6 +98,11 @@ public abstract
 		return this.updateEvent(event, cache);
 	}
 
+	@Override
+	public boolean isListed(E event, L listing) {
+		return this.getCache(event).get(listing.getId()).getStatus() == Status.LISTED;
+	}
+
 	private CompletableFuture<Void> updateEvent(final E event, final RMap<I, C> cache) {
 		List<CompletableFuture<Void>> cfs = new ArrayList<>(cache.size());
 

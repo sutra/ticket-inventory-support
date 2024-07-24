@@ -98,20 +98,6 @@ public abstract
 		return this.updateEvent(event, cache);
 	}
 
-	@Override
-	public boolean isListed(E event, L listing) {
-		return Optional.ofNullable(this.getCache(event))
-			.map(c -> c.get(listing.getId()))
-			.map(C::getStatus).orElse(null) == Status.LISTED;
-	}
-
-	@Override
-	public Optional<R> getRequest(E event, L listing) {
-		return Optional.ofNullable(this.getCache(event))
-			.map(c -> c.get(listing.getId()))
-			.map(C::getRequest);
-	}
-
 	private CompletableFuture<Void> updateEvent(final E event, final RMap<I, C> cache) {
 		List<CompletableFuture<Void>> cfs = new ArrayList<>(cache.size());
 
@@ -221,16 +207,17 @@ public abstract
 	protected abstract void deleteListing(E event, I ticketId) throws IOException;
 
 	@Override
-	public long getCacheSize() {
-		return this.getCacheNamesStream().count();
+	public boolean isListed(E event, L listing) {
+		return getCachedListing(event, listing).map(C::getStatus).orElse(null) == Status.LISTED;
 	}
 
 	@Override
-	public long getListedCount() {
-		return this.getCacheNamesStream().map(key -> {
-			RMap<I, C> cache = this.redisson.getMap(key);
-			return cache.values().parallelStream().filter(l -> l.getStatus() == Status.LISTED).count();
-		}).reduce(0L, Long::sum);
+	public Optional<R> getRequest(E event, L listing) {
+		return getCachedListing(event, listing).map(C::getRequest);
+	}
+
+	private Optional<C> getCachedListing(E event, L listing) {
+		return Optional.ofNullable(this.getCache(event)).map(c -> c.get(listing.getId()));
 	}
 
 	protected RMap<I, C> getCache(final E event) {
@@ -274,6 +261,19 @@ public abstract
 
 	protected String getCacheNamePattern() {
 		return String.format("%s:listings:*", this.keyPrefix);
+	}
+
+	@Override
+	public long getCacheSize() {
+		return this.getCacheNamesStream().count();
+	}
+
+	@Override
+	public long getListedCount() {
+		return this.getCacheNamesStream().map(key -> {
+			RMap<I, C> cache = this.redisson.getMap(key);
+			return cache.values().parallelStream().filter(l -> l.getStatus() == Status.LISTED).count();
+		}).reduce(0L, Long::sum);
 	}
 
 	protected <T> CompletableFuture<T> callAsync(Callable<T> callable) {

@@ -9,7 +9,7 @@
 	<parent>
 		<groupId>org.oxerr.ticket.inventory.support.cached</groupId>
 		<artifactId>ticket-inventory-support-cached</artifactId>
-		<version>4.2.0</version>
+		<version>4.2.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>ticket-inventory-support-cached-core</artifactId>
 	<name>Ticket Inventory Support - Cached - Core</name>

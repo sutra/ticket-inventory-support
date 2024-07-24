@@ -105,6 +105,13 @@ public abstract
 			.map(C::getStatus).orElse(null) == Status.LISTED;
 	}
 
+	@Override
+	public Optional<R> getRequest(E event, L listing) {
+		return Optional.ofNullable(this.getCache(event))
+			.map(c -> c.get(listing.getId()))
+			.map(C::getRequest);
+	}
+
 	private CompletableFuture<Void> updateEvent(final E event, final RMap<I, C> cache) {
 		List<CompletableFuture<Void>> cfs = new ArrayList<>(cache.size());
 

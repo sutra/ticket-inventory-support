@@ -1,6 +1,7 @@
 package org.oxerr.ticket.inventory.support.cached;
 
 import java.io.Serializable;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
@@ -45,6 +46,18 @@ public interface CachedListingService<
 	 * @since 4.1.0
 	 */
 	boolean isListed(E event, L listing);
+
+	/**
+	 * Returns the request of the listing.
+	 *
+	 * @param event the event.
+	 * @param listing the listing.
+	 * @return the request.
+	 * @see Listing#getRequest()
+	 *
+	 * @since 4.2.0
+	 */
+	Optional<R> getRequest(E event, L listing);
 
 	/**
 	 * Gets all cache names using Stream.

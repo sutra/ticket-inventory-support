@@ -54,6 +54,8 @@ public interface CachedListingService<
 	 * @param listing the listing.
 	 * @return the request.
 	 * @see Listing#getRequest()
+	 *
+	 * @since 4.2.0
 	 */
 	Optional<R> getRequest(E event, L listing);
 

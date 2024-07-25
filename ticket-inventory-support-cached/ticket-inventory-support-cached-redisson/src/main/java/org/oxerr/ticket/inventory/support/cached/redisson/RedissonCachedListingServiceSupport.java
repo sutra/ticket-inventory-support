@@ -216,6 +216,11 @@ public abstract
 		return getCachedListing(event, listing).map(C::getRequest);
 	}
 
+	@Override
+	public Optional<R> getListedRequest(E event, L listing) {
+		return getCachedListing(event, listing).filter(c -> c.getStatus() == Status.LISTED).map(C::getRequest);
+	}
+
 	private Optional<C> getCachedListing(E event, L listing) {
 		return Optional.ofNullable(this.getCache(event)).map(c -> c.get(listing.getId()));
 	}

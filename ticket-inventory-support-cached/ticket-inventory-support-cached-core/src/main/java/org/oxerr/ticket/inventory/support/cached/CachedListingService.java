@@ -60,6 +60,18 @@ public interface CachedListingService<
 	Optional<R> getRequest(E event, L listing);
 
 	/**
+	 * Returns the request of the listing which is listed.
+	 *
+	 * @param event the event.
+	 * @param listing the listing.
+	 * @return the request.
+	 * @see Listing#getRequest()
+	 *
+	 * @since 4.3.0
+	 */
+	Optional<R> getListedRequest(E event, L listing);
+
+	/**
 	 * Gets all cache names using Stream.
 	 *
 	 * @return the cache names.

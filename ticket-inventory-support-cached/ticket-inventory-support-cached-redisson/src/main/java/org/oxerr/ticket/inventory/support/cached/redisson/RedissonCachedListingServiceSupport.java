@@ -208,21 +208,36 @@ public abstract
 
 	@Override
 	public boolean isListed(E event, L listing) {
-		return getCachedListing(event, listing).map(C::getStatus).orElse(null) == Status.LISTED;
+		return isListed(event, listing.getId());
+	}
+
+	@Override
+	public boolean isListed(E event, I listingId) {
+		return getCachedListing(event, listingId).map(C::getStatus).orElse(null) == Status.LISTED;
 	}
 
 	@Override
 	public Optional<R> getRequest(E event, L listing) {
-		return getCachedListing(event, listing).map(C::getRequest);
+		return getRequest(event, listing.getId());
+	}
+
+	@Override
+	public Optional<R> getRequest(E event, I listingId) {
+		return getCachedListing(event, listingId).map(C::getRequest);
 	}
 
 	@Override
 	public Optional<R> getListedRequest(E event, L listing) {
-		return getCachedListing(event, listing).filter(c -> c.getStatus() == Status.LISTED).map(C::getRequest);
+		return getListedRequest(event, listing.getId());
 	}
 
-	private Optional<C> getCachedListing(E event, L listing) {
-		return Optional.ofNullable(this.getCache(event)).map(c -> c.get(listing.getId()));
+	@Override
+	public Optional<R> getListedRequest(E event, I listingId) {
+		return getCachedListing(event, listingId).filter(c -> c.getStatus() == Status.LISTED).map(C::getRequest);
+	}
+
+	private Optional<C> getCachedListing(E event, I listingId) {
+		return Optional.ofNullable(this.getCache(event)).map(c -> c.get(listingId));
 	}
 
 	protected RMap<I, C> getCache(final E event) {

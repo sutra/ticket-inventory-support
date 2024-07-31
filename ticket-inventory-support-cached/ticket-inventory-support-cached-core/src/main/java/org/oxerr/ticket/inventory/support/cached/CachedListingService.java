@@ -48,6 +48,17 @@ public interface CachedListingService<
 	boolean isListed(E event, L listing);
 
 	/**
+	 * Returns {@code true} if, and only if, the listing is listed.
+	 *
+	 * @param event the event.
+	 * @param listingId the {@link Listing#getId()}.
+	 * @return {@code true} if the listing is listed, otherwise {@code false}.
+	 *
+	 * @since 4.4.0
+	 */
+	boolean isListed(E event, I listingId);
+
+	/**
 	 * Returns the request of the listing.
 	 *
 	 * @param event the event.
@@ -60,6 +71,18 @@ public interface CachedListingService<
 	Optional<R> getRequest(E event, L listing);
 
 	/**
+	 * Returns the request of the listing.
+	 *
+	 * @param event the event.
+	 * @param listingId the {@link Listing#getId()}.
+	 * @return the request.
+	 * @see Listing#getRequest()
+	 *
+	 * @since 4.4.0
+	 */
+	Optional<R> getRequest(E event, I listingId);
+
+	/**
 	 * Returns the request of the listing which is listed.
 	 *
 	 * @param event the event.
@@ -70,6 +93,18 @@ public interface CachedListingService<
 	 * @since 4.3.0
 	 */
 	Optional<R> getListedRequest(E event, L listing);
+
+	/**
+	 * Returns the request of the listing which is listed.
+	 *
+	 * @param event the event.
+	 * @param listingId the {@link Listing#getId()}.
+	 * @return the request.
+	 * @see Listing#getRequest()
+	 *
+	 * @since 4.4.0
+	 */
+	Optional<R> getListedRequest(E event, I listingId);
 
 	/**
 	 * Gets all cache names using Stream.

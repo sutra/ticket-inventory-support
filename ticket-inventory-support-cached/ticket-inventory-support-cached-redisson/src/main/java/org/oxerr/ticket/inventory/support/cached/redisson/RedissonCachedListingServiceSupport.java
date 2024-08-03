@@ -135,11 +135,11 @@ public abstract
 	}
 
 	private List<CompletableFuture<Void>> delete(final E event, final RMap<I, C> cache) {
-		final Set<I> inventoryTicketIds = event.getListings().parallelStream()
+		final Set<I> inventoryListingIds = event.getListings().parallelStream()
 			.map(L::getId).collect(Collectors.toSet());
 
 		final Map<I, C> pendings = cache.entrySet().parallelStream()
-			.filter(t -> this.shouldDelete(event, inventoryTicketIds, t.getKey(), t.getValue()))
+			.filter(t -> this.shouldDelete(event, inventoryListingIds, t.getKey(), t.getValue()))
 			.collect(Collectors.toMap(Map.Entry::getKey, e -> {
 				var v = e.getValue();
 				v.setStatus(Status.PENDING_DELETE);
@@ -150,7 +150,7 @@ public abstract
 
 		// delete
 		return pendings.entrySet().parallelStream().map(Map.Entry::getKey).distinct()
-			.map(ticketId -> this.deleteListingAsync(event, ticketId).thenAccept(r -> cache.remove(ticketId)))
+			.map(listingId -> this.deleteListingAsync(event, listingId).thenAccept(r -> cache.remove(listingId)))
 			.collect(Collectors.toList());
 	}
 
@@ -166,11 +166,11 @@ public abstract
 
 	protected boolean shouldDelete(
 		@Nonnull final E event,
-		@Nonnull final Set<I> inventoryTicketIds,
-		@Nonnull final I ticketId,
+		@Nonnull final Set<I> inventoryListingIds,
+		@Nonnull final I listingId,
 		@Nonnull final C cachedListing
 	) {
-		return !inventoryTicketIds.contains(ticketId);
+		return !inventoryListingIds.contains(listingId);
 	}
 
 	private C toPending(final E event, final L listing) {
@@ -195,16 +195,16 @@ public abstract
 		});
 	}
 
-	private CompletableFuture<Boolean> deleteListingAsync(E event, I ticketId) {
+	private CompletableFuture<Boolean> deleteListingAsync(E event, I listingId) {
 		return this.callAsync(() -> {
-			this.deleteListing(event, ticketId);
+			this.deleteListing(event, listingId);
 			return true;
 		});
 	}
 
 	protected abstract void createListing(E event, L listing) throws IOException;
 
-	protected abstract void deleteListing(E event, I ticketId) throws IOException;
+	protected abstract void deleteListing(E event, I listingId) throws IOException;
 
 	@Override
 	public boolean isListed(E event, L listing) {

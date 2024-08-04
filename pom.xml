@@ -18,7 +18,7 @@
 		Ticket Inventory Support - Support classes for ticket inventory.
 	</description>
 	<packaging>pom</packaging>
-	<version>4.4.0</version>
+	<version>5.0.0</version>
 	<url>https://www.oxerr.org/ticket-inventory-support</url>
 	<inceptionYear>2023</inceptionYear>
 	<properties>
@@ -88,7 +88,7 @@
 			<dependency>
 				<groupId>org.redisson</groupId>
 				<artifactId>redisson</artifactId>
-				<version>3.33.0</version>
+				<version>3.34.1</version>
 			</dependency>
 			<dependency>
 				<groupId>com.google.code.findbugs</groupId>

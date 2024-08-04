@@ -5,9 +5,11 @@ package org.oxerr.ticket.inventory.support.cached.redisson;
  */
 public enum Status {
 
-	PENDING_DELETE,
+	PENDING_CREATE,
 
-	PENDING_LIST,
+	PENDING_UPDATE,
+
+	PENDING_DELETE,
 
 	LISTED;
 

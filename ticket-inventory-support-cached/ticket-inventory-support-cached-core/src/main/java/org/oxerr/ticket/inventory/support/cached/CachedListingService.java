@@ -128,21 +128,11 @@ public interface CachedListingService<
 	 */
 	long getCacheSize();
 
-	@Deprecated(since = "3.0.1", forRemoval = true)
-	default long cacheSize() {
-		return this.getCacheSize();
-	}
-
 	/**
 	 * Returns the listing count which status is listed.
 	 *
 	 * @return the listing count which status is listed.
 	 */
 	long getListedCount();
-
-	@Deprecated(since = "3.0.1", forRemoval = true)
-	default long listedCount() {
-		return this.getListedCount();
-	}
 
 }

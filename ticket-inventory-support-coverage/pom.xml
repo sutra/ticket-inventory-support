@@ -9,7 +9,7 @@
 	<parent>
 		<groupId>org.oxerr.ticket.inventory.support</groupId>
 		<artifactId>ticket-inventory-support</artifactId>
-		<version>4.4.1-SNAPSHOT</version>
+		<version>5.0.0</version>
 	</parent>
 	<artifactId>ticket-inventory-support-coverage</artifactId>
 	<name>Ticket Inventory Support - Coverage</name>

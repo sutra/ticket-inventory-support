@@ -169,17 +169,17 @@ public abstract
 	}
 
 	private List<CompletableFuture<Void>> create(final E event, final RMap<I, C> cache) {
-		final List<L> pendingReplaceListings = event.getListings().parallelStream()
+		final List<L> pendingReplaceListings = event.getListings().stream()
 			.filter(listing -> this.shouldCreate(event, listing, cache.get(listing.getId())))
 			.collect(Collectors.toList());
 
-		final Map<I, C> pendings = pendingReplaceListings.parallelStream()
+		final Map<I, C> pendings = pendingReplaceListings.stream()
 			.collect(Collectors.toMap(L::getId, v -> this.toCached(event, v, Status.PENDING_CREATE)));
 
 		cache.putAll(pendings);
 
 		// create
-		return pendingReplaceListings.parallelStream()
+		return pendingReplaceListings.stream()
 			.map(
 				listing -> this.createListingAsync(event, listing)
 					.thenAccept((Boolean r) -> {
@@ -191,17 +191,17 @@ public abstract
 	}
 
 	private List<CompletableFuture<Void>> update(final E event, final RMap<I, C> cache) {
-		final List<L> pendingReplaceListings = event.getListings().parallelStream()
+		final List<L> pendingReplaceListings = event.getListings().stream()
 			.filter(listing -> this.shouldUpdate(event, listing, cache.get(listing.getId())))
 			.collect(Collectors.toList());
 
-		final Map<I, C> pendings = pendingReplaceListings.parallelStream()
+		final Map<I, C> pendings = pendingReplaceListings.stream()
 			.collect(Collectors.toMap(L::getId, v -> this.toCached(event, v, Status.PENDING_UPDATE)));
 
 		cache.putAll(pendings);
 
 		// update
-		return pendingReplaceListings.parallelStream()
+		return pendingReplaceListings.stream()
 			.map(
 				listing -> this.updateListingAsync(event, listing)
 					.thenAccept((Boolean r) -> {
@@ -213,10 +213,10 @@ public abstract
 	}
 
 	private List<CompletableFuture<Void>> delete(final E event, final RMap<I, C> cache) {
-		final Set<I> inventoryListingIds = event.getListings().parallelStream()
+		final Set<I> inventoryListingIds = event.getListings().stream()
 			.map(L::getId).collect(Collectors.toSet());
 
-		final Map<I, C> pendings = cache.entrySet().parallelStream()
+		final Map<I, C> pendings = cache.entrySet().stream()
 			.filter(t -> this.shouldDelete(event, inventoryListingIds, t.getKey(), t.getValue()))
 			.collect(Collectors.toMap(Map.Entry::getKey, e -> {
 				var v = e.getValue();
@@ -227,7 +227,7 @@ public abstract
 		cache.putAll(pendings);
 
 		// delete
-		return pendings.entrySet().parallelStream().map(Map.Entry::getKey).distinct()
+		return pendings.entrySet().stream().map(Map.Entry::getKey).distinct()
 			.map(listingId -> this.deleteListingAsync(event, listingId).thenAccept(r -> cache.remove(listingId)))
 			.collect(Collectors.toList());
 	}
@@ -393,7 +393,7 @@ public abstract
 	public long getListedCount() {
 		return this.getCacheNamesStream().map(key -> {
 			RMap<I, C> cache = this.redisson.getMap(key);
-			return cache.values().parallelStream().filter(l -> l.getStatus() == Status.LISTED).count();
+			return cache.values().stream().filter(l -> l.getStatus() == Status.LISTED).count();
 		}).reduce(0L, Long::sum);
 	}
 

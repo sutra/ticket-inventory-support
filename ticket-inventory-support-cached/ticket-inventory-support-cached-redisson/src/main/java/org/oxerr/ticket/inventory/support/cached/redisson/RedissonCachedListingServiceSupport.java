@@ -2,7 +2,6 @@ package org.oxerr.ticket.inventory.support.cached.redisson;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +46,7 @@ public abstract
 >
 	implements CachedListingService<P, I, R, L, E> {
 
-	private final boolean create;
+	private final ListingConfiguration configuration;
 
 	protected final RedissonClient redisson;
 
@@ -58,6 +57,16 @@ public abstract
 
 	protected final Executor executor;
 
+	/**
+	 * Constructs {@link RedissonCachedListingServiceSupport}.
+	 *
+	 * @param redisson the {@link RedissonClient}.
+	 * @param keyPrefix the key prefix for Redis entries.
+	 * @param create indicates if listings should be created.
+	 *
+	 * @deprecated Use {@link #RedissonCachedListingServiceSupport(RedissonClient, String, Executor, ListingConfiguration)} instead.
+	 */
+	@Deprecated(forRemoval = true, since = "5.0.0")
 	protected RedissonCachedListingServiceSupport(
 		final RedissonClient redisson,
 		final String keyPrefix,
@@ -71,19 +80,59 @@ public abstract
 	 *
 	 * @param redisson the {@link RedissonClient}.
 	 * @param keyPrefix the key prefix for Redis entries.
-	 * @param executor the executor
+	 * @param executor the executor.
 	 * @param create indicates if listings should be created.
+	 *
+	 * @deprecated Use {@link #RedissonCachedListingServiceSupport(RedissonClient, String, Executor, ListingConfiguration)} instead.
 	 */
+	@Deprecated(forRemoval = true, since = "5.0.0")
 	protected RedissonCachedListingServiceSupport(
 		final RedissonClient redisson,
 		final String keyPrefix,
 		final Executor executor,
 		final boolean create
 	) {
+		this(redisson, keyPrefix, executor, new ListingConfiguration(create, true, true));
+	}
+
+	/**
+	 * Constructs {@link RedissonCachedListingServiceSupport}
+	 * with {@link ForkJoinPool#commonPool()} as the executor.
+	 *
+	 * @param redisson the {@link RedissonClient}.
+	 * @param keyPrefix the key prefix for Redis entries.
+	 * @param configuration the configuration.
+	 *
+	 * @since 5.0.0
+	 */
+	protected RedissonCachedListingServiceSupport(
+		final RedissonClient redisson,
+		final String keyPrefix,
+		final ListingConfiguration configuration
+	) {
+		this(redisson, keyPrefix, ForkJoinPool.commonPool(), configuration);
+	}
+
+	/**
+	 * Constructs {@link RedissonCachedListingServiceSupport}.
+	 *
+	 * @param redisson the {@link RedissonClient}.
+	 * @param keyPrefix the key prefix for Redis entries.
+	 * @param executor the executor.
+	 * @param configuration the configuration.
+	 *
+	 * @since 5.0.0
+	 */
+	protected RedissonCachedListingServiceSupport(
+		final RedissonClient redisson,
+		final String keyPrefix,
+		final Executor executor,
+		final ListingConfiguration configuration
+	) {
 		this.redisson = redisson;
 		this.keyPrefix = keyPrefix;
 		this.executor = executor;
-		this.create = create;
+		this.configuration = configuration;
 	}
 
 	/**
@@ -102,10 +151,17 @@ public abstract
 		List<CompletableFuture<Void>> cfs = new ArrayList<>(cache.size());
 
 		// delete
-		cfs.addAll(this.delete(event, cache));
+		if (this.configuration.isDelete()) {
+			cfs.addAll(this.delete(event, cache));
+		}
 
-		// create/update
-		if (this.create) {
+		// update
+		if (this.configuration.isUpdate()) {
+			cfs.addAll(this.update(event, cache));
+		}
+
+		// create
+		if (this.configuration.isCreate()) {
 			cfs.addAll(this.create(event, cache));
 		}
 
@@ -113,22 +169,44 @@ public abstract
 	}
 
 	private List<CompletableFuture<Void>> create(final E event, final RMap<I, C> cache) {
-		final List<L> pendingCreateListings = event.getListings().parallelStream()
+		final List<L> pendingReplaceListings = event.getListings().parallelStream()
 			.filter(listing -> this.shouldCreate(event, listing, cache.get(listing.getId())))
 			.collect(Collectors.toList());
 
-		final Map<I, C> pendings = pendingCreateListings.parallelStream()
-			.collect(Collectors.toMap(L::getId, v -> this.toPending(event, v)));
+		final Map<I, C> pendings = pendingReplaceListings.parallelStream()
+			.collect(Collectors.toMap(L::getId, v -> this.toCached(event, v, Status.PENDING_CREATE)));
 
 		cache.putAll(pendings);
 
 		// create
-		return pendingCreateListings.parallelStream()
+		return pendingReplaceListings.parallelStream()
 			.map(
 				listing -> this.createListingAsync(event, listing)
 					.thenAccept((Boolean r) -> {
 						if (r.booleanValue()) {
-							cache.put(listing.getId(), this.toListed(event, listing));
+							cache.put(listing.getId(), this.toCached(event, listing, Status.LISTED));
+						}
+					})
+			).collect(Collectors.toList());
+	}
+
+	private List<CompletableFuture<Void>> update(final E event, final RMap<I, C> cache) {
+		final List<L> pendingReplaceListings = event.getListings().parallelStream()
+			.filter(listing -> this.shouldUpdate(event, listing, cache.get(listing.getId())))
+			.collect(Collectors.toList());
+
+		final Map<I, C> pendings = pendingReplaceListings.parallelStream()
+			.collect(Collectors.toMap(L::getId, v -> this.toCached(event, v, Status.PENDING_UPDATE)));
+
+		cache.putAll(pendings);
+
+		// update
+		return pendingReplaceListings.parallelStream()
+			.map(
+				listing -> this.updateListingAsync(event, listing)
+					.thenAccept((Boolean r) -> {
+						if (r.booleanValue()) {
+							cache.put(listing.getId(), this.toCached(event, listing, Status.LISTED));
 						}
 					})
 			).collect(Collectors.toList());
@@ -159,9 +237,31 @@ public abstract
 		@Nonnull final L listing,
 		@Nullable final C cachedListing
 	) {
-		return cachedListing == null
-			|| cachedListing.getStatus() == Status.PENDING_LIST
-			|| !cachedListing.getRequest().equals(listing.getRequest());
+		// Cached is null or pending create.
+		return cachedListing == null || cachedListing.getStatus() == Status.PENDING_CREATE;
+	}
+
+	/**
+	 * Returns if should update this listing.
+	 *
+	 * @return true if should update.
+	 *
+	 * @since 5.0.0
+	 */
+	protected boolean shouldUpdate(
+		@Nonnull final E event,
+		@Nonnull final L listing,
+		@Nullable final C cachedListing
+	) {
+		if (cachedListing == null) {
+			return false;
+		}
+
+		if (cachedListing.getStatus() == Status.PENDING_UPDATE) {
+			return true;
+		}
+
+		return cachedListing.getStatus() == Status.LISTED && !cachedListing.getRequest().equals(listing.getRequest());
 	}
 
 	protected boolean shouldDelete(
@@ -170,24 +270,29 @@ public abstract
 		@Nonnull final I listingId,
 		@Nonnull final C cachedListing
 	) {
+		// The listing ID is not in the cache.
 		return !inventoryListingIds.contains(listingId);
-	}
-
-	private C toPending(final E event, final L listing) {
-		return toCached(event, listing, Status.PENDING_LIST);
-	}
-
-	private C toListed(final E event, final L listing) {
-		return toCached(event, listing, Status.LISTED);
 	}
 
 	protected abstract C toCached(E event, L listing, Status status);
 
 	private CompletableFuture<Boolean> createListingAsync(E event, L listing) {
 		return this.callAsync(() -> {
-			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_LIST) {
-				// If it is still in PENDING_LIST status, create the listing.
+			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_CREATE) {
+				// If it is still in PENDING_CREATE status, create the listing.
 				this.createListing(event, listing);
+				return true;
+			} else {
+				return false;
+			}
+		});
+	}
+
+	private CompletableFuture<Boolean> updateListingAsync(E event, L listing) {
+		return this.callAsync(() -> {
+			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_UPDATE) {
+				// If it is still in PENDING_UPDATE status, update the listing.
+				this.updateListing(event, listing);
 				return true;
 			} else {
 				return false;
@@ -203,6 +308,19 @@ public abstract
 	}
 
 	protected abstract void createListing(E event, L listing) throws IOException;
+
+	/**
+	 * Update the listing.
+	 *
+	 * @param event the event.
+	 * @param listing the listing.
+	 * @throws IOException indicates update failed.
+	 * 
+	 * @since 5.0.0
+	 */
+	protected void updateListing(E event, L listing) throws IOException {
+		this.createListing(event, listing);
+	}
 
 	protected abstract void deleteListing(E event, I listingId) throws IOException;
 
@@ -247,23 +365,6 @@ public abstract
 
 	protected RMap<I, C> getCache(final String name) {
 		return this.redisson.getMap(name);
-	}
-
-	/**
-	 * For Redisson Map no need to set the expiration date.
-	 * When the Map is empty, it is totally deleted from Redis.
-	 *
-	 * @param event the event.
-	 * @return the expiration date.
-	 */
-	@Deprecated(since = "3.3.1", forRemoval = true)
-	protected Instant getCacheExpireDate(final E event) {
-		return event.getStartDate().toInstant();
-	}
-
-	@Deprecated(since = "3.0.1", forRemoval = true)
-	protected Instant cacheEndDate(final E event) {
-		return this.getCacheExpireDate(event);
 	}
 
 	public Stream<String> getCacheNamesStream() {

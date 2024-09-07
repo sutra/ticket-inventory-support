@@ -168,22 +168,53 @@ public abstract
 		return CompletableFuture.allOf(cfs.toArray(CompletableFuture[]::new));
 	}
 
+	private class ListingDetails {
+
+		private final E event;
+
+		private final L listing;
+
+		private final C cachedListing;
+
+		public ListingDetails(E event, L listing, C cachedListing) {
+			this.event = event;
+			this.listing = listing;
+			this.cachedListing = cachedListing;
+		}
+
+		public E getEvent() {
+			return event;
+		}
+
+		public L getListing() {
+			return listing;
+		}
+
+		public C getCachedListing() {
+			return cachedListing;
+		}
+
+	}
+
 	private List<CompletableFuture<Void>> create(final E event, final RMap<I, C> cache) {
-		final List<L> pendingReplaceListings = event.getListings().stream()
-			.filter(listing -> this.shouldCreate(event, listing, cache.get(listing.getId())))
+		final List<ListingDetails> pendingReplaces = event.getListings().stream()
+			.map(listing -> new ListingDetails(event, listing, cache.get(listing.getId())))
+			.filter(details -> this.shouldCreate(details.getEvent(), details.getListing(), details.getCachedListing()))
 			.collect(Collectors.toList());
 
-		final Map<I, C> pendings = pendingReplaceListings.stream()
+		final Map<I, C> pendings = pendingReplaces.stream()
+			.map(ListingDetails::getListing)
 			.collect(Collectors.toMap(L::getId, v -> this.toCached(event, v, Status.PENDING_CREATE)));
 
 		cache.putAll(pendings);
 
 		// create
-		return pendingReplaceListings.stream()
+		return pendingReplaces.stream()
 			.map(
-				listing -> this.createListingAsync(event, listing)
+				entity -> this.createListingAsync(entity.getEvent(), entity.getListing(), this.getPriority(entity.getEvent(), entity.getListing(), entity.getCachedListing()))
 					.thenAccept((Boolean r) -> {
 						if (r.booleanValue()) {
+							var listing = entity.getListing();
 							cache.put(listing.getId(), this.toCached(event, listing, Status.LISTED));
 						}
 					})
@@ -191,21 +222,24 @@ public abstract
 	}
 
 	private List<CompletableFuture<Void>> update(final E event, final RMap<I, C> cache) {
-		final List<L> pendingReplaceListings = event.getListings().stream()
-			.filter(listing -> this.shouldUpdate(event, listing, cache.get(listing.getId())))
+		final List<ListingDetails> pendingReplaces = event.getListings().stream()
+			.map(listing -> new ListingDetails(event, listing, cache.get(listing.getId())))
+			.filter(details -> this.shouldUpdate(details.event, details.getListing(), details.getCachedListing()))
 			.collect(Collectors.toList());
 
-		final Map<I, C> pendings = pendingReplaceListings.stream()
+		final Map<I, C> pendings = pendingReplaces.stream()
+			.map(ListingDetails::getListing)
 			.collect(Collectors.toMap(L::getId, v -> this.toCached(event, v, Status.PENDING_UPDATE)));
 
 		cache.putAll(pendings);
 
 		// update
-		return pendingReplaceListings.stream()
+		return pendingReplaces.stream()
 			.map(
-				listing -> this.updateListingAsync(event, listing)
+				entity -> this.updateListingAsync(entity.getEvent(), entity.getListing(), this.getPriority(entity.getEvent(), entity.getListing(), entity.getCachedListing()))
 					.thenAccept((Boolean r) -> {
 						if (r.booleanValue()) {
+							var listing = entity.getListing();
 							cache.put(listing.getId(), this.toCached(event, listing, Status.LISTED));
 						}
 					})
@@ -227,9 +261,15 @@ public abstract
 		cache.putAll(pendings);
 
 		// delete
-		return pendings.entrySet().stream().map(Map.Entry::getKey).distinct()
-			.map(listingId -> this.deleteListingAsync(event, listingId).thenAccept(r -> cache.remove(listingId)))
-			.collect(Collectors.toList());
+		return pendings.entrySet().stream()
+			.map(
+				entry -> this.deleteListingAsync(event, entry.getKey(), this.getPriority(event, null, entry.getValue()))
+					.thenAccept((Boolean r) -> {
+						if (r.booleanValue()) {
+							cache.remove(entry.getKey());
+						}
+					})
+			).collect(Collectors.toList());
 	}
 
 	protected boolean shouldCreate(
@@ -264,6 +304,23 @@ public abstract
 		return cachedListing.getStatus() == Status.LISTED && !cachedListing.getRequest().equals(listing.getRequest());
 	}
 
+	/**
+	 * Returns the priority.
+	 *
+	 * @param event the event.
+	 * @param listing the listing.
+	 * @param cachedListing the cached listing.
+	 * @return the priority
+	 * @since 5.1.0
+	 */
+	protected int getPriority(
+		@Nonnull final E event,
+		@Nullable final L listing,
+		@Nullable final C cachedListing
+	) {
+		return 0;
+	}
+
 	protected boolean shouldDelete(
 		@Nonnull final E event,
 		@Nonnull final Set<I> inventoryListingIds,
@@ -276,11 +333,11 @@ public abstract
 
 	protected abstract C toCached(E event, L listing, Status status);
 
-	private CompletableFuture<Boolean> createListingAsync(E event, L listing) {
+	private CompletableFuture<Boolean> createListingAsync(E event, L listing, int priority ) {
 		return this.callAsync(() -> {
 			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_CREATE) {
 				// If it is still in PENDING_CREATE status, create the listing.
-				this.createListing(event, listing);
+				this.createListing(event, listing, priority );
 				return true;
 			} else {
 				return false;
@@ -288,11 +345,11 @@ public abstract
 		});
 	}
 
-	private CompletableFuture<Boolean> updateListingAsync(E event, L listing) {
+	private CompletableFuture<Boolean> updateListingAsync(E event, L listing, int priority) {
 		return this.callAsync(() -> {
 			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_UPDATE) {
 				// If it is still in PENDING_UPDATE status, update the listing.
-				this.updateListing(event, listing);
+				this.updateListing(event, listing, priority);
 				return true;
 			} else {
 				return false;
@@ -300,14 +357,18 @@ public abstract
 		});
 	}
 
-	private CompletableFuture<Boolean> deleteListingAsync(E event, I listingId) {
+	private CompletableFuture<Boolean> deleteListingAsync(E event, I listingId, int priority ) {
 		return this.callAsync(() -> {
-			this.deleteListing(event, listingId);
+			this.deleteListing(event, listingId, priority);
 			return true;
 		});
 	}
 
 	protected abstract void createListing(E event, L listing) throws IOException;
+
+	protected void createListing(E event, L listing, int priority) throws IOException {
+		this.createListing(event, listing);
+	}
 
 	/**
 	 * Update the listing.
@@ -315,14 +376,32 @@ public abstract
 	 * @param event the event.
 	 * @param listing the listing.
 	 * @throws IOException indicates update failed.
-	 * 
+	 *
 	 * @since 5.0.0
 	 */
 	protected void updateListing(E event, L listing) throws IOException {
 		this.createListing(event, listing);
 	}
 
+	/**
+	 * Update the listing.
+	 *
+	 * @param event the event.
+	 * @param listing the listing.
+	 * @param priority the priority.
+	 * @throws IOException indicates update failed.
+	 *
+	 * @since 5.1.0
+	 */
+	protected void updateListing(E event, L listing, int priority) throws IOException {
+		this.createListing(event, listing, priority);
+	}
+
 	protected abstract void deleteListing(E event, I listingId) throws IOException;
+
+	protected void deleteListing(E event, I listingId, int priority) throws IOException {
+		this.deleteListing(event, listingId);
+	}
 
 	@Override
 	public boolean isListed(E event, L listing) {

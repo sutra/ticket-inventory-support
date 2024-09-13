@@ -454,15 +454,22 @@ public abstract
 	}
 
 	private Optional<C> getCachedListing(P eventId, I listingId) {
-		return Optional.ofNullable(this.getCache(eventId)).map(c -> c.get(listingId));
+		return Optional.ofNullable(this.getEventCache(eventId)).map(c -> c.get(listingId));
 	}
 
 	@Deprecated(since = "5.2.0", forRemoval = true)
 	protected RMap<I, C> getCache(final E event) {
-		return getCache(event.getId());
+		return getEventCache(event.getId());
 	}
 
-	protected RMap<I, C> getCache(P eventId) {
+	/**
+	 * Returns the cache for the event.
+	 *
+	 * @param eventId
+	 * @return the cache for the event.
+	 * @since 5.2.0
+	 */
+	protected RMap<I, C> getEventCache(P eventId) {
 		var name = this.getCacheName(eventId);
 		return this.getCache(name);
 	}

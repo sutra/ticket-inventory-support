@@ -68,7 +68,20 @@ public interface CachedListingService<
 	 *
 	 * @since 4.2.0
 	 */
+	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getRequest(E event, L listing);
+
+	/**
+	 * Returns the request of the listing.
+	 *
+	 * @param eventId the event ID.
+	 * @param listing the listing.
+	 * @return the request.
+	 * @see Listing#getRequest()
+	 *
+	 * @since 5.2.0
+	 */
+	Optional<R> getRequest(P eventId, L listing);
 
 	/**
 	 * Returns the request of the listing.
@@ -80,7 +93,20 @@ public interface CachedListingService<
 	 *
 	 * @since 4.4.0
 	 */
+	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getRequest(E event, I listingId);
+
+	/**
+	 * Returns the request of the listing.
+	 *
+	 * @param eventid the event ID.
+	 * @param listingId the listing ID.
+	 * @return the request.
+	 * @see Listing#getRequest()
+	 *
+	 * @since 5.2.0
+	 */
+	Optional<R> getRequest(P eventId, I listingId);
 
 	/**
 	 * Returns the request of the listing which is listed.
@@ -92,7 +118,20 @@ public interface CachedListingService<
 	 *
 	 * @since 4.3.0
 	 */
+	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getListedRequest(E event, L listing);
+
+	/**
+	 * Returns the request of the listing which is listed.
+	 *
+	 * @param eventId the event ID.
+	 * @param listing the listing.
+	 * @return the request.
+	 * @see Listing#getRequest()
+	 *
+	 * @since 5.2.0
+	 */
+	Optional<R> getListedRequest(P eventId, L listing);
 
 	/**
 	 * Returns the request of the listing which is listed.
@@ -104,7 +143,20 @@ public interface CachedListingService<
 	 *
 	 * @since 4.4.0
 	 */
+	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getListedRequest(E event, I listingId);
+
+	/**
+	 * Returns the request of the listing which is listed.
+	 *
+	 * @param eventId the event ID.
+	 * @param listingId the listing ID.
+	 * @return the request.
+	 * @see Listing#getRequest()
+	 *
+	 * @since 5.2.0
+	 */
+	Optional<R> getListedRequest(P eventId, I listingId);
 
 	/**
 	 * Gets all cache names using Stream.

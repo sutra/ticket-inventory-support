@@ -284,6 +284,9 @@ public abstract
 	/**
 	 * Returns if should update this listing.
 	 *
+	 * @param event the event.
+	 * @param listing the listing.
+	 * @param cachedListing the cached listing.
 	 * @return true if should update.
 	 *
 	 * @since 5.0.0
@@ -410,35 +413,68 @@ public abstract
 
 	@Override
 	public boolean isListed(E event, I listingId) {
-		return getCachedListing(event, listingId).map(C::getStatus).orElse(null) == Status.LISTED;
+		return getCachedListing(event.getId(), listingId).map(C::getStatus).orElse(null) == Status.LISTED;
 	}
 
 	@Override
 	public Optional<R> getRequest(E event, L listing) {
-		return getRequest(event, listing.getId());
+		return getRequest(event.getId(), listing);
+	}
+
+	@Override
+	public Optional<R> getRequest(P eventId, L listing) {
+		return getRequest(eventId, listing.getId());
 	}
 
 	@Override
 	public Optional<R> getRequest(E event, I listingId) {
-		return getCachedListing(event, listingId).map(C::getRequest);
+		return getRequest(event.getId(), listingId);
+	}
+
+	@Override
+	public Optional<R> getRequest(P eventId, I listingId) {
+		return getCachedListing(eventId, listingId).map(C::getRequest);
 	}
 
 	@Override
 	public Optional<R> getListedRequest(E event, L listing) {
-		return getListedRequest(event, listing.getId());
+		return getListedRequest(event.getId(), listing);
+	}
+
+	@Override
+	public Optional<R> getListedRequest(P eventId, L listing) {
+		return getListedRequest(eventId, listing.getId());
 	}
 
 	@Override
 	public Optional<R> getListedRequest(E event, I listingId) {
-		return getCachedListing(event, listingId).filter(c -> c.getStatus() == Status.LISTED).map(C::getRequest);
+		return getListedRequest(event.getId(), listingId);
 	}
 
-	private Optional<C> getCachedListing(E event, I listingId) {
-		return Optional.ofNullable(this.getCache(event)).map(c -> c.get(listingId));
+	@Override
+	public Optional<R> getListedRequest(P eventId, I listingId) {
+		return getCachedListing(eventId, listingId).filter(c -> c.getStatus() == Status.LISTED).map(C::getRequest);
 	}
 
+	private Optional<C> getCachedListing(P eventId, I listingId) {
+		return Optional.ofNullable(this.getEventCache(eventId)).map(c -> c.get(listingId));
+	}
+
+	@Deprecated(since = "5.2.0", forRemoval = true)
 	protected RMap<I, C> getCache(final E event) {
-		var name = this.getCacheName(event);
+		return getEventCache(event.getId());
+	}
+
+	/**
+	 * Returns the cache for the event.
+	 *
+	 * @param eventId the event ID.
+	 * @return the cache for the event.
+	 *
+	 * @since 5.2.0
+	 */
+	protected RMap<I, C> getEventCache(P eventId) {
+		var name = this.getCacheName(eventId);
 		return this.getCache(name);
 	}
 
@@ -455,8 +491,13 @@ public abstract
 		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern, count);
 	}
 
+	@Deprecated(since = "5.2.0", forRemoval = true)
 	protected String getCacheName(final E event) {
-		return String.format("%s:listings:%s", keyPrefix, event.getId());
+		return getCacheName(event.getId());
+	}
+
+	protected String getCacheName(P eventId) {
+		return String.format("%s:listings:%s", keyPrefix, eventId);
 	}
 
 	protected String getCacheNamePattern() {

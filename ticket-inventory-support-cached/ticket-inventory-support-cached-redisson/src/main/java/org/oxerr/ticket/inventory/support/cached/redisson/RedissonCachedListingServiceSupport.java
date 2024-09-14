@@ -284,6 +284,9 @@ public abstract
 	/**
 	 * Returns if should update this listing.
 	 *
+	 * @param event the event.
+	 * @param listing the listing.
+	 * @param cachedListing the cached listing.
 	 * @return true if should update.
 	 *
 	 * @since 5.0.0
@@ -465,8 +468,9 @@ public abstract
 	/**
 	 * Returns the cache for the event.
 	 *
-	 * @param eventId
+	 * @param eventId the event ID.
 	 * @return the cache for the event.
+	 *
 	 * @since 5.2.0
 	 */
 	protected RMap<I, C> getEventCache(P eventId) {

@@ -99,7 +99,7 @@ public interface CachedListingService<
 	/**
 	 * Returns the request of the listing.
 	 *
-	 * @param eventid the event ID.
+	 * @param eventId the event ID.
 	 * @param listingId the listing ID.
 	 * @return the request.
 	 * @see Listing#getRequest()

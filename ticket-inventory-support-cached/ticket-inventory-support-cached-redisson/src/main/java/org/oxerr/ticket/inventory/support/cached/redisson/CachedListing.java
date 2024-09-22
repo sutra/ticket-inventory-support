@@ -9,23 +9,21 @@ public class CachedListing<R extends Serializable> implements Serializable {
 
 	private static final long serialVersionUID = 2023031801L;
 
-	private Status status;
-
 	private R request;
+
+	private Status status;
 
 	public CachedListing() {
 	}
 
+	@Deprecated(since = "5.3.0", forRemoval = true)
 	public CachedListing(Status status, R request) {
 		this.status = status;
 		this.request = request;
 	}
 
-	public Status getStatus() {
-		return status;
-	}
-
-	public void setStatus(Status status) {
+	public CachedListing(R request, Status status) {
+		this.request = request;
 		this.status = status;
 	}
 
@@ -35,6 +33,14 @@ public class CachedListing<R extends Serializable> implements Serializable {
 
 	public void setRequest(R request) {
 		this.request = request;
+	}
+
+	public Status getStatus() {
+		return status;
+	}
+
+	public void setStatus(Status status) {
+		this.status = status;
 	}
 
 	@Override

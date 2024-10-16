@@ -67,6 +67,7 @@ public interface CachedListingService<
 	 * @see Listing#getRequest()
 	 *
 	 * @since 4.2.0
+	 * @deprecated Use {@link #getRequest(P, I)} instead.
 	 */
 	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getRequest(E event, L listing);
@@ -92,6 +93,7 @@ public interface CachedListingService<
 	 * @see Listing#getRequest()
 	 *
 	 * @since 4.4.0
+	 * @deprecated Use {@link #getRequest(P, I)} instead.
 	 */
 	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getRequest(E event, I listingId);
@@ -117,6 +119,7 @@ public interface CachedListingService<
 	 * @see Listing#getRequest()
 	 *
 	 * @since 4.3.0
+	 * @deprecated Use {@link #getListedRequest(P, I)} instead.
 	 */
 	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getListedRequest(E event, L listing);

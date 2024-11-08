@@ -28,8 +28,9 @@ public interface CachedListingService<
 	/**
 	 * Updates the listings of the event.
 	 *
-	 * Deletes all listings that should be deleted, creates/updates all listings
-	 * that should be created/updated.
+	 * Deletes all listings that should be deleted,
+	 * creates all listings that should be created,
+	 * updates all listings that should be updated.
 	 *
 	 * @param event the event.
 	 * @return the result.

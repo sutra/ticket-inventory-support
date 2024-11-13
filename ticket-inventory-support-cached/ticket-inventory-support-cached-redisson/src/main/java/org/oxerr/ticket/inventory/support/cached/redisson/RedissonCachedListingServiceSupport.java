@@ -147,7 +147,7 @@ public abstract
 	 */
 	@Override
 	public CompletableFuture<Void> updateListings(final E event) {
-		var cache = this.getCache(event);
+		var cache = this.getEventCache(event.getId());
 		return this.updateEvent(event, cache);
 	}
 
@@ -349,7 +349,7 @@ public abstract
 
 	private CompletableFuture<Boolean> createListingAsync(E event, L listing, int priority ) {
 		return this.callAsync(() -> {
-			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_CREATE) {
+			if (Optional.ofNullable(this.getEventCache(event.getId()).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_CREATE) {
 				// If it is still in PENDING_CREATE status, create the listing.
 				this.createListing(event, listing, priority );
 				return true;
@@ -361,7 +361,7 @@ public abstract
 
 	private CompletableFuture<Boolean> updateListingAsync(E event, L listing, int priority) {
 		return this.callAsync(() -> {
-			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_UPDATE) {
+			if (Optional.ofNullable(this.getEventCache(event.getId()).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_UPDATE) {
 				// If it is still in PENDING_UPDATE status, update the listing.
 				this.updateListing(event, listing, priority);
 				return true;

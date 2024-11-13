@@ -19,6 +19,8 @@ import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.oxerr.ticket.inventory.support.Event;
 import org.oxerr.ticket.inventory.support.Listing;
 import org.oxerr.ticket.inventory.support.cached.CachedListingService;
@@ -45,6 +47,8 @@ public abstract
 	C extends CachedListing<R>
 >
 	implements CachedListingService<P, I, R, L, E> {
+
+	private final Logger log = LogManager.getLogger();
 
 	private final ListingConfiguration configuration;
 
@@ -278,6 +282,8 @@ public abstract
 		@Nullable final C cachedListing
 	) {
 		// Cached is null or pending create.
+		log.trace("shouldCreate: event={}, listing={}, cachedListing={}", event, listing, cachedListing);
+
 		return cachedListing == null || cachedListing.getStatus() == Status.PENDING_CREATE;
 	}
 
@@ -296,6 +302,9 @@ public abstract
 		@Nonnull final L listing,
 		@Nullable final C cachedListing
 	) {
+		// Cached is null or pending update.
+		log.trace("shouldUpdate: event={}, listing={}, cachedListing={}", event, listing, cachedListing);
+
 		if (cachedListing == null) {
 			return false;
 		}
@@ -331,6 +340,8 @@ public abstract
 		@Nonnull final C cachedListing
 	) {
 		// The listing ID is not in the cache.
+		log.trace("shouldDelete: event={}, inventoryListingIds={}, listingId={}, cachedListing={}", event, inventoryListingIds, listingId, cachedListing);
+
 		return !inventoryListingIds.contains(listingId);
 	}
 

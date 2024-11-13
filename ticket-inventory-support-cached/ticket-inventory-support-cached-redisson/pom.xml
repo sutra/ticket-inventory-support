@@ -15,6 +15,10 @@
 	<name>Ticket Inventory Support - Cached - Redisson Implementation Support</name>
 	<dependencies>
 		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-api</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-api</artifactId>
 			<scope>test</scope>

@@ -282,9 +282,13 @@ public abstract
 		@Nullable final C cachedListing
 	) {
 		// Cached is null or pending create.
-		log.trace("shouldCreate: event={}, listing={}, cachedListing={}", event, listing, cachedListing);
 
-		return cachedListing == null || cachedListing.getStatus() == Status.PENDING_CREATE;
+		var shouldCreate = cachedListing == null || cachedListing.getStatus() == Status.PENDING_CREATE;
+
+		log.trace("shouldCreate: event={}, listing={}, cachedListing={}, shouldCreate={}",
+			event::getId, listing::getId, cachedListing::getStatus, () -> shouldCreate);
+
+		return shouldCreate;
 	}
 
 	/**
@@ -303,8 +307,6 @@ public abstract
 		@Nullable final C cachedListing
 	) {
 		// Cached is null or pending update.
-		log.trace("shouldUpdate: event={}, listing={}, cachedListing={}", event, listing, cachedListing);
-
 		if (cachedListing == null) {
 			return false;
 		}
@@ -313,7 +315,12 @@ public abstract
 			return true;
 		}
 
-		return cachedListing.getStatus() == Status.LISTED && !cachedListing.getRequest().equals(listing.getRequest());
+		var shouldUpdate = cachedListing.getStatus() == Status.LISTED && !cachedListing.getRequest().equals(listing.getRequest());
+
+		log.trace("shouldUpdate: event={}, listing={}, cachedListing={}, shouldUpdate={}",
+			event::getId, listing::getId, cachedListing::getStatus, () -> shouldUpdate);
+
+		return shouldUpdate;
 	}
 
 	/**
@@ -340,9 +347,13 @@ public abstract
 		@Nonnull final C cachedListing
 	) {
 		// The listing ID is not in the cache.
-		log.trace("shouldDelete: event={}, inventoryListingIds={}, listingId={}, cachedListing={}", event, inventoryListingIds, listingId, cachedListing);
 
-		return !inventoryListingIds.contains(listingId);
+		var shouldDelete = !inventoryListingIds.contains(listingId);
+
+		log.trace("shouldDelete: event={}, inventoryListingIds={}, listingId={}, cachedListing={}, shouldDelete={}",
+			event::getId, inventoryListingIds::size, () -> listingId, cachedListing::getStatus, () -> shouldDelete);
+
+		return shouldDelete;
 	}
 
 	protected abstract C toCached(E event, L listing, Status status);

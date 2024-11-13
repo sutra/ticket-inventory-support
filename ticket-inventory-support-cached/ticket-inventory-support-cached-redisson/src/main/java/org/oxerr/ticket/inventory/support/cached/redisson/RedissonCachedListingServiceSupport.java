@@ -350,7 +350,7 @@ public abstract
 
 		var shouldDelete = !inventoryListingIds.contains(listingId);
 
-		log.trace("shouldDelete: event={}, inventoryListingIds={}, listingId={}, cachedListing={}, shouldDelete={}",
+		log.trace("shouldDelete: event={}, inventoryListingIds.size={}, listingId={}, cachedListing={}, shouldDelete={}",
 			event::getId, inventoryListingIds::size, () -> listingId, cachedListing::getStatus, () -> shouldDelete);
 
 		return shouldDelete;

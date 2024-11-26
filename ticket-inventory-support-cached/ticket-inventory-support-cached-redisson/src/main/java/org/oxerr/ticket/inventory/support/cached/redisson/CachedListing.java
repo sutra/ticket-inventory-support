@@ -16,6 +16,13 @@ public class CachedListing<R extends Serializable> implements Serializable {
 	public CachedListing() {
 	}
 
+	/**
+	 * Constructor for backward compatibility.
+	 *
+	 * @param status status of the listing request.
+	 * @param request request of the listing request.
+	 * @deprecated Use {@link #CachedListing(R, Status)} instead.
+	 */
 	@Deprecated(since = "5.3.0", forRemoval = true)
 	public CachedListing(Status status, R request) {
 		this.status = status;

@@ -28,8 +28,9 @@ public interface CachedListingService<
 	/**
 	 * Updates the listings of the event.
 	 *
-	 * Deletes all listings that should be deleted, creates/updates all listings
-	 * that should be created/updated.
+	 * Deletes all listings that should be deleted,
+	 * creates all listings that should be created,
+	 * updates all listings that should be updated.
 	 *
 	 * @param event the event.
 	 * @return the result.
@@ -67,6 +68,7 @@ public interface CachedListingService<
 	 * @see Listing#getRequest()
 	 *
 	 * @since 4.2.0
+	 * @deprecated Use {@link #getRequest(P, I)} instead.
 	 */
 	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getRequest(E event, L listing);
@@ -92,6 +94,7 @@ public interface CachedListingService<
 	 * @see Listing#getRequest()
 	 *
 	 * @since 4.4.0
+	 * @deprecated Use {@link #getRequest(P, I)} instead.
 	 */
 	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getRequest(E event, I listingId);
@@ -117,6 +120,7 @@ public interface CachedListingService<
 	 * @see Listing#getRequest()
 	 *
 	 * @since 4.3.0
+	 * @deprecated Use {@link #getListedRequest(P, I)} instead.
 	 */
 	@Deprecated(since = "5.2.0", forRemoval = true)
 	Optional<R> getListedRequest(E event, L listing);

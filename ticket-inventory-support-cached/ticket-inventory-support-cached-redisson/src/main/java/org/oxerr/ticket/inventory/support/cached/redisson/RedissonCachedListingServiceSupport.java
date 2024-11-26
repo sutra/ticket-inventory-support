@@ -19,6 +19,8 @@ import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.oxerr.ticket.inventory.support.Event;
 import org.oxerr.ticket.inventory.support.Listing;
 import org.oxerr.ticket.inventory.support.cached.CachedListingService;
@@ -45,6 +47,8 @@ public abstract
 	C extends CachedListing<R>
 >
 	implements CachedListingService<P, I, R, L, E> {
+
+	private final Logger log = LogManager.getLogger();
 
 	private final ListingConfiguration configuration;
 
@@ -143,7 +147,7 @@ public abstract
 	 */
 	@Override
 	public CompletableFuture<Void> updateListings(final E event) {
-		var cache = this.getCache(event);
+		var cache = this.getEventCache(event.getId());
 		return this.updateEvent(event, cache);
 	}
 
@@ -278,7 +282,17 @@ public abstract
 		@Nullable final C cachedListing
 	) {
 		// Cached is null or pending create.
-		return cachedListing == null || cachedListing.getStatus() == Status.PENDING_CREATE;
+
+		var shouldCreate = cachedListing == null || cachedListing.getStatus() == Status.PENDING_CREATE;
+
+		log.trace("shouldCreate: event={}, listing={}, cachedListing={}, shouldCreate={}",
+			event::getId,
+			listing::getId,
+			() -> Optional.ofNullable(cachedListing).map(CachedListing::getStatus).orElse(null),
+			() -> shouldCreate
+		);
+
+		return shouldCreate;
 	}
 
 	/**
@@ -296,6 +310,7 @@ public abstract
 		@Nonnull final L listing,
 		@Nullable final C cachedListing
 	) {
+		// Cached is null or pending update.
 		if (cachedListing == null) {
 			return false;
 		}
@@ -304,7 +319,12 @@ public abstract
 			return true;
 		}
 
-		return cachedListing.getStatus() == Status.LISTED && !cachedListing.getRequest().equals(listing.getRequest());
+		var shouldUpdate = cachedListing.getStatus() == Status.LISTED && !cachedListing.getRequest().equals(listing.getRequest());
+
+		log.trace("shouldUpdate: event={}, listing={}, cachedListing={}, shouldUpdate={}",
+			event::getId, listing::getId, cachedListing::getStatus, () -> shouldUpdate);
+
+		return shouldUpdate;
 	}
 
 	/**
@@ -331,14 +351,20 @@ public abstract
 		@Nonnull final C cachedListing
 	) {
 		// The listing ID is not in the cache.
-		return !inventoryListingIds.contains(listingId);
+
+		var shouldDelete = !inventoryListingIds.contains(listingId);
+
+		log.trace("shouldDelete: event={}, inventoryListingIds.size={}, listingId={}, cachedListing={}, shouldDelete={}",
+			event::getId, inventoryListingIds::size, () -> listingId, cachedListing::getStatus, () -> shouldDelete);
+
+		return shouldDelete;
 	}
 
 	protected abstract C toCached(E event, L listing, Status status);
 
 	private CompletableFuture<Boolean> createListingAsync(E event, L listing, int priority ) {
 		return this.callAsync(() -> {
-			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_CREATE) {
+			if (Optional.ofNullable(this.getEventCache(event.getId()).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_CREATE) {
 				// If it is still in PENDING_CREATE status, create the listing.
 				this.createListing(event, listing, priority );
 				return true;
@@ -350,7 +376,7 @@ public abstract
 
 	private CompletableFuture<Boolean> updateListingAsync(E event, L listing, int priority) {
 		return this.callAsync(() -> {
-			if (Optional.ofNullable(this.getCache(event).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_UPDATE) {
+			if (Optional.ofNullable(this.getEventCache(event.getId()).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_UPDATE) {
 				// If it is still in PENDING_UPDATE status, update the listing.
 				this.updateListing(event, listing, priority);
 				return true;

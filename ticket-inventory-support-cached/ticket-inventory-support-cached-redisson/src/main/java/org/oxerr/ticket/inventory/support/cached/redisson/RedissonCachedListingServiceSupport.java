@@ -286,7 +286,11 @@ public abstract
 		var shouldCreate = cachedListing == null || cachedListing.getStatus() == Status.PENDING_CREATE;
 
 		log.trace("shouldCreate: event={}, listing={}, cachedListing={}, shouldCreate={}",
-			event::getId, listing::getId, cachedListing::getStatus, () -> shouldCreate);
+			event::getId,
+			listing::getId,
+			() -> Optional.ofNullable(cachedListing).map(CachedListing::getStatus).orElse(null),
+			() -> shouldCreate
+		);
 
 		return shouldCreate;
 	}

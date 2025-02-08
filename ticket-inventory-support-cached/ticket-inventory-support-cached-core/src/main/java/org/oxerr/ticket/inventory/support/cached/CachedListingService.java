@@ -169,10 +169,10 @@ public interface CachedListingService<
 	/**
 	 * Gets all cache names using Stream.
 	 *
-	 * @param count keys loaded per request to cache system.
+	 * @param chunkSize amount of loaded keys per request to cache system.
 	 * @return the cache names.
 	 */
-	Stream<String> getCacheNamesStream(int count);
+	Stream<String> getCacheNamesStream(int chunkSize);
 
 	/**
 	 * Returns the size of the cache.

@@ -26,6 +26,7 @@ import org.oxerr.ticket.inventory.support.Listing;
 import org.oxerr.ticket.inventory.support.cached.CachedListingService;
 import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
+import org.redisson.api.options.KeysScanOptions;
 
 /**
  * The {@link CachedListingService} implementation using Redisson.
@@ -512,9 +513,10 @@ public abstract
 		return this.getCacheNamesStream(10);
 	}
 
-	public Stream<String> getCacheNamesStream(int count) {
+	public Stream<String> getCacheNamesStream(int chunkSize) {
 		var keyPattern = this.getCacheNamePattern();
-		return this.redisson.getKeys().getKeysStreamByPattern(keyPattern, count);
+		var keysScanOptions = KeysScanOptions.defaults().pattern(keyPattern).chunkSize(chunkSize);
+		return this.redisson.getKeys().getKeysStream(keysScanOptions);
 	}
 
 	@Deprecated(since = "5.2.0", forRemoval = true)

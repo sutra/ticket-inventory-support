@@ -241,7 +241,7 @@ public abstract
 		// update
 		return pendingReplaces.stream()
 			.map(
-				entity -> this.updateListingAsync(entity.getEvent(), entity.getListing(), this.getPriority(entity.getEvent(), entity.getListing(), entity.getCachedListing()))
+				entity -> this.updateListingAsync(entity.getEvent(), entity.getListing(), entity.getCachedListing(), this.getPriority(entity.getEvent(), entity.getListing(), entity.getCachedListing()))
 					.thenAccept((Boolean r) -> {
 						if (r.booleanValue()) {
 							var listing = entity.getListing();
@@ -375,7 +375,7 @@ public abstract
 		});
 	}
 
-	private CompletableFuture<Boolean> updateListingAsync(E event, L listing, int priority) {
+	private CompletableFuture<Boolean> updateListingAsync(E event, L listing, C cachedListing, int priority) {
 		return this.callAsync(() -> {
 			if (Optional.ofNullable(this.getEventCache(event.getId()).get(listing.getId())).map(C::getStatus).orElse(null) == Status.PENDING_UPDATE) {
 				// If it is still in PENDING_UPDATE status, update the listing.
@@ -409,6 +409,7 @@ public abstract
 	 *
 	 * @since 5.0.0
 	 */
+	@Deprecated(since = "5.6.0", forRemoval = true)
 	protected void updateListing(E event, L listing) throws IOException {
 		this.updateListing(event, listing, 0);
 	}
@@ -423,7 +424,23 @@ public abstract
 	 *
 	 * @since 5.1.0
 	 */
+	@Deprecated(since = "5.6.0", forRemoval = true)
 	protected void updateListing(E event, L listing, int priority) throws IOException {
+		this.createListing(event, listing, priority);
+	}
+
+	/**
+	 * Update the listing.
+	 *
+	 * @param event the event.
+	 * @param listing the listing.
+	 * @param cachedListing the cached listing.
+	 * @param priority the priority.
+	 * @throws IOException indicates I/O exception.
+	 *
+	 * @since 5.6.0
+	 */
+	protected void updateListing(E event, L listing, C cachedListing, int priority) throws IOException {
 		this.createListing(event, listing, priority);
 	}
 

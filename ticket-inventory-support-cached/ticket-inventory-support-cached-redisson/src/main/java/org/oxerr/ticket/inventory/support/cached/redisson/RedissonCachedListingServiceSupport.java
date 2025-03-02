@@ -410,7 +410,7 @@ public abstract
 	 * @since 5.0.0
 	 */
 	protected void updateListing(E event, L listing) throws IOException {
-		this.createListing(event, listing);
+		this.updateListing(event, listing, 0);
 	}
 
 	/**

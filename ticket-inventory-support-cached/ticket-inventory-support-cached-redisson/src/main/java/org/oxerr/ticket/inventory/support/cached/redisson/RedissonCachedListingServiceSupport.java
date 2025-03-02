@@ -427,9 +427,20 @@ public abstract
 		this.createListing(event, listing, priority);
 	}
 
-	@Deprecated(since = "5.4.1", forRemoval = true)
+	@Deprecated(since = "5.5.0", forRemoval = true)
 	protected abstract void deleteListing(E event, I listingId) throws IOException;
 
+	/**
+	 * Delete the listing on the marketplace.
+	 *
+	 * @param event the event.
+	 * @param listingId the listing ID.
+	 * @param cachedListing the cached listing.
+	 * @param priority the priority.
+	 * @throws IOException indicates I/O exception.
+	 *
+	 * @since 5.5.0
+	 */
 	protected void deleteListing(E event, I listingId, C cachedListing, int priority) throws IOException {
 		this.deleteListing(event, listingId, priority);
 	}

@@ -9,7 +9,7 @@
 	<parent>
 		<groupId>org.oxerr.ticket.inventory.support.cached</groupId>
 		<artifactId>ticket-inventory-support-cached</artifactId>
-		<version>5.4.0</version>
+		<version>5.5.0</version>
 	</parent>
 	<artifactId>ticket-inventory-support-cached-redisson</artifactId>
 	<name>Ticket Inventory Support - Cached - Redisson Implementation Support</name>
@@ -17,11 +17,6 @@
 		<dependency>
 			<groupId>org.apache.logging.log4j</groupId>
 			<artifactId>log4j-api</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-api</artifactId>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.redisson</groupId>

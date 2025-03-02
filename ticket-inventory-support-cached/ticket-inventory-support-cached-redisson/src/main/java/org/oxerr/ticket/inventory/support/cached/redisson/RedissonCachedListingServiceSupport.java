@@ -268,7 +268,7 @@ public abstract
 		// delete
 		return pendings.entrySet().stream()
 			.map(
-				entry -> this.deleteListingAsync(event, entry.getKey(), this.getPriority(event, null, entry.getValue()))
+				entry -> this.deleteListingAsync(event, entry.getKey(), entry.getValue(), this.getPriority(event, null, entry.getValue()))
 					.thenAccept((Boolean r) -> {
 						if (r.booleanValue()) {
 							cache.remove(entry.getKey());
@@ -387,9 +387,9 @@ public abstract
 		});
 	}
 
-	private CompletableFuture<Boolean> deleteListingAsync(E event, I listingId, int priority ) {
+	private CompletableFuture<Boolean> deleteListingAsync(E event, I listingId, C cachedListing, int priority ) {
 		return this.callAsync(() -> {
-			this.deleteListing(event, listingId, priority);
+			this.deleteListing(event, listingId, cachedListing, priority);
 			return true;
 		});
 	}
@@ -410,7 +410,7 @@ public abstract
 	 * @since 5.0.0
 	 */
 	protected void updateListing(E event, L listing) throws IOException {
-		this.createListing(event, listing);
+		this.updateListing(event, listing, 0);
 	}
 
 	/**
@@ -427,8 +427,25 @@ public abstract
 		this.createListing(event, listing, priority);
 	}
 
+	@Deprecated(since = "5.5.0", forRemoval = true)
 	protected abstract void deleteListing(E event, I listingId) throws IOException;
 
+	/**
+	 * Delete the listing on the marketplace.
+	 *
+	 * @param event the event.
+	 * @param listingId the listing ID.
+	 * @param cachedListing the cached listing.
+	 * @param priority the priority.
+	 * @throws IOException indicates I/O exception.
+	 *
+	 * @since 5.5.0
+	 */
+	protected void deleteListing(E event, I listingId, C cachedListing, int priority) throws IOException {
+		this.deleteListing(event, listingId, priority);
+	}
+
+	@Deprecated(since = "5.4.1", forRemoval = true)
 	protected void deleteListing(E event, I listingId, int priority) throws IOException {
 		this.deleteListing(event, listingId);
 	}

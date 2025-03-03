@@ -19,7 +19,7 @@
 		Ticket Inventory Support - Support classes for ticket inventory.
 	</description>
 	<packaging>pom</packaging>
-	<version>5.6.1</version>
+	<version>5.6.2-SNAPSHOT</version>
 	<url>https://www.oxerr.org/ticket-inventory-support</url>
 	<inceptionYear>2023</inceptionYear>
 	<properties>

@@ -439,9 +439,26 @@ public abstract
 	 * @throws IOException indicates I/O exception.
 	 *
 	 * @since 5.6.0
+	 * @deprecated this argument cachedListing is useless
 	 */
+	@Deprecated(since = "5.6.2", forRemoval = true)
 	protected void updateListing(E event, L listing, C cachedListing, int priority) throws IOException {
 		this.createListing(event, listing, priority);
+	}
+
+	/**
+	 * Update the listings.
+	 *
+	 * @param event the event.
+	 * @param target the target listing, the listing after being updated.
+	 * @param source the source listing, the listing before being updated.
+	 * @param priority the priority.
+	 * @throws IOException indicates I/O exception.
+	 *
+	 * @since 5.6.2
+	 */
+	protected void updateListing(E event, L target, @Nullable L source, int priority) throws IOException {
+		this.createListing(event, target, priority);
 	}
 
 	@Deprecated(since = "5.5.0", forRemoval = true)

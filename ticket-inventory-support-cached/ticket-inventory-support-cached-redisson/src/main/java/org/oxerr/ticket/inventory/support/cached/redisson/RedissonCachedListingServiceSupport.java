@@ -1,6 +1,5 @@
 package org.oxerr.ticket.inventory.support.cached.redisson;
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -394,9 +393,9 @@ public abstract
 		});
 	}
 
-	protected abstract void createListing(E event, L listing) throws IOException;
+	protected abstract void createListing(E event, L listing);
 
-	protected void createListing(E event, L listing, int priority) throws IOException {
+	protected void createListing(E event, L listing, int priority) {
 		this.createListing(event, listing);
 	}
 
@@ -405,12 +404,11 @@ public abstract
 	 *
 	 * @param event the event.
 	 * @param listing the listing.
-	 * @throws IOException indicates update failed.
 	 *
 	 * @since 5.0.0
 	 */
 	@Deprecated(since = "5.6.0", forRemoval = true)
-	protected void updateListing(E event, L listing) throws IOException {
+	protected void updateListing(E event, L listing) {
 		this.updateListing(event, listing, 0);
 	}
 
@@ -420,12 +418,11 @@ public abstract
 	 * @param event the event.
 	 * @param listing the listing.
 	 * @param priority the priority.
-	 * @throws IOException indicates update failed.
 	 *
 	 * @since 5.1.0
 	 */
 	@Deprecated(since = "5.6.0", forRemoval = true)
-	protected void updateListing(E event, L listing, int priority) throws IOException {
+	protected void updateListing(E event, L listing, int priority) {
 		this.createListing(event, listing, priority);
 	}
 
@@ -436,13 +433,12 @@ public abstract
 	 * @param listing the listing.
 	 * @param cachedListing the cached listing.
 	 * @param priority the priority.
-	 * @throws IOException indicates I/O exception.
 	 *
 	 * @since 5.6.0
 	 * @deprecated this argument cachedListing is useless
 	 */
 	@Deprecated(since = "5.6.2", forRemoval = true)
-	protected void updateListing(E event, L listing, C cachedListing, int priority) throws IOException {
+	protected void updateListing(E event, L listing, C cachedListing, int priority) {
 		this.createListing(event, listing, priority);
 	}
 
@@ -453,16 +449,15 @@ public abstract
 	 * @param target the target listing, the listing after being updated.
 	 * @param source the source listing, the listing before being updated.
 	 * @param priority the priority.
-	 * @throws IOException indicates I/O exception.
 	 *
 	 * @since 5.6.2
 	 */
-	protected void updateListing(E event, L target, @Nullable L source, int priority) throws IOException {
+	protected void updateListing(E event, L target, @Nullable L source, int priority) {
 		this.createListing(event, target, priority);
 	}
 
 	@Deprecated(since = "5.5.0", forRemoval = true)
-	protected abstract void deleteListing(E event, I listingId) throws IOException;
+	protected abstract void deleteListing(E event, I listingId);
 
 	/**
 	 * Delete the listing on the marketplace.
@@ -471,16 +466,15 @@ public abstract
 	 * @param listingId the listing ID.
 	 * @param cachedListing the cached listing.
 	 * @param priority the priority.
-	 * @throws IOException indicates I/O exception.
 	 *
 	 * @since 5.5.0
 	 */
-	protected void deleteListing(E event, I listingId, C cachedListing, int priority) throws IOException {
+	protected void deleteListing(E event, I listingId, C cachedListing, int priority) {
 		this.deleteListing(event, listingId, priority);
 	}
 
 	@Deprecated(since = "5.4.1", forRemoval = true)
-	protected void deleteListing(E event, I listingId, int priority) throws IOException {
+	protected void deleteListing(E event, I listingId, int priority) {
 		this.deleteListing(event, listingId);
 	}
 

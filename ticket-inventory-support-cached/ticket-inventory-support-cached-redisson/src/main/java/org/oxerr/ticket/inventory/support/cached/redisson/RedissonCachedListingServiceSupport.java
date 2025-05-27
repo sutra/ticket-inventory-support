@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -602,6 +603,9 @@ public abstract
 
 	// org.springframework.util.concurrent.FutureUtils
 	protected static <T> Supplier<T> toSupplier(Callable<T> callable, CompletableFuture<T> result) {
+		Objects.requireNonNull(callable, "Callable must not be null");
+		Objects.requireNonNull(result, "Result must not be null");
+
 		return () -> {
 			try {
 				return callable.call();

@@ -148,11 +148,14 @@ public abstract
 	 */
 	@Override
 	public CompletableFuture<Void> updateListings(final E event) {
-		var cache = this.getEventCache(event.getId());
+		log.trace("updateListings: event={}", event::getId);
+		RMap<I, C> cache = this.getEventCache(event.getId());
 		return this.updateEvent(event, cache);
 	}
 
 	private CompletableFuture<Void> updateEvent(final E event, final RMap<I, C> cache) {
+		log.trace("updateEvent: event={}, cache.size={}", event::getId, cache::size);
+
 		List<CompletableFuture<Void>> cfs = new ArrayList<>(cache.size());
 
 		// delete
@@ -169,6 +172,8 @@ public abstract
 		if (this.configuration.isCreate()) {
 			cfs.addAll(this.create(event, cache));
 		}
+
+		log.trace("updateEvent: event={}, cache.size={}, cfs.size={}", event::getId, cache::size, cfs::size);
 
 		return CompletableFuture.allOf(cfs.toArray(CompletableFuture[]::new));
 	}
